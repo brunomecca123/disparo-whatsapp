@@ -310,18 +310,19 @@ async function loadConnection() {
 // por isso fica no cabeçalho e vira faixa de alerta quando sai do verde.
 const QUALIDADE = {
   GREEN: {
-    classe: 'q-green', rotulo: 'qualidade boa',
+    // Alta/Média/Baixa é a própria nomenclatura da Meta para o quality rating.
+    classe: 'q-green', rotulo: 'QUALIDADE ALTA',
   },
   YELLOW: {
-    classe: 'q-yellow', rotulo: 'qualidade em alerta', icone: '⚠️',
-    titulo: 'Atenção: a qualidade do número caiu para AMARELO',
+    classe: 'q-yellow', rotulo: 'QUALIDADE MÉDIA', icone: '⚠️',
+    titulo: 'QUALIDADE MÉDIA — o número exige atenção',
     texto: 'Nas últimas 24h um número relevante de pessoas bloqueou ou denunciou suas mensagens. ' +
-           'Se cair para vermelho, seu limite diário de envios diminui. Segure disparos grandes, ' +
+           'Se a nota cair para BAIXA, seu limite diário de envios diminui. Segure disparos grandes, ' +
            'confira se a lista é de quem realmente espera contato e revise o texto do template.',
   },
   RED: {
-    classe: 'q-red', rotulo: 'qualidade baixa', icone: '🚨',
-    titulo: 'Risco: a qualidade do número está VERMELHA',
+    classe: 'q-red', rotulo: 'QUALIDADE BAIXA', icone: '🚨',
+    titulo: 'QUALIDADE BAIXA — risco de restrição do número',
     texto: 'O número está em observação pela Meta. Se não melhorar em até 7 dias, o limite diário ' +
            'cai um degrau e o envio pode ser restringido. Pause campanhas de marketing agora e ' +
            'envie só para quem interage com você.',
@@ -337,7 +338,7 @@ const STATUS_NUMERO = {
 
 function renderQualidade(conn) {
   const nota = (conn.quality_rating || '').toUpperCase();
-  const info = QUALIDADE[nota] || { classe: 'q-unknown', rotulo: 'qualidade indefinida' };
+  const info = QUALIDADE[nota] || { classe: 'q-unknown', rotulo: 'QUALIDADE NÃO INFORMADA' };
   const tier = conn.messaging_limit_tier ? ` · ${esc(String(conn.messaging_limit_tier).replace('TIER_', '').toLowerCase())}/dia` : '';
   $('qualityChip').innerHTML =
     `<span class="qchip ${info.classe}" title="Qualidade do número na Meta"><span class="qdot"></span>${esc(info.rotulo)}${tier}</span>`;
@@ -345,7 +346,7 @@ function renderQualidade(conn) {
   const statusAviso = STATUS_NUMERO[(conn.status || '').toUpperCase()];
   if (!info.titulo && !statusAviso) { $('qualityBanner').innerHTML = ''; return; }
   const classe = (nota === 'RED' || statusAviso) ? 'q-red' : 'q-yellow';
-  const titulo = info.titulo || 'Atenção com o status do número';
+  const titulo = info.titulo || 'ATENÇÃO — situação do número';
   const texto = [info.texto, statusAviso].filter(Boolean).join(' ');
   $('qualityBanner').innerHTML =
     `<div class="qbanner ${classe}"><span class="qicon">${info.icone || '🚨'}</span>
