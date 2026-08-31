@@ -487,6 +487,25 @@ def set_campaign_rate(campaign_id: str, payload: RatePayload):
     return {"rate": nova}
 
 
+class RunPayload(BaseModel):
+    time_budget_s: Optional[float] = None
+
+
+@app.post("/api/campaigns/{campaign_id}/run")
+def rodar_lote(campaign_id: str, payload: Optional[RunPayload] = None):
+    """Envia um lote da campanha dentro desta requisição, devolvendo o estado atualizado.
+
+    É o caminho de quando a função não consegue chamar a si mesma (deployment protegido):
+    o navegador, que tem sessão para passar pela proteção, pede um lote de cada vez até a
+    fila acabar. A trava no banco continua garantindo uma execução por campanha.
+    """
+    if not campaign_service.get_campaign(campaign_id):
+        raise HTTPException(404, "campanha não encontrada")
+    orcamento = (payload.time_budget_s if payload else None) or campaign_service.LOTE_CLIENTE_S
+    campaign_service.executar(campaign_id, orcamento)
+    return campaign_service.get_status(campaign_id)
+
+
 @app.post("/api/campaigns/{campaign_id}/resume")
 def resume_campaign(campaign_id: str, payload: Optional[RatePayload] = None):
     """Retoma uma campanha interrompida: dispara só para quem ficou pendente."""

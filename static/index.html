@@ -265,7 +265,7 @@
 const state = {
   templates: [], template: null, upload: null, mapping: {}, validation: null, campaign: null, historico: [],
   headerMedia: null, campaignId: null, poll: null, samples: [], sampleIndex: 0,
-  quality: null, phoneStatus: null
+  quality: null, phoneStatus: null, conduzindo: null
 };
 
 const $ = id => document.getElementById(id);
@@ -795,7 +795,34 @@ async function startCampaign(payload, confirmText) {
       body: JSON.stringify(payload)
     });
     abrirCampanha(data.campaign_id, { scroll: true });
+    if (data.started_by === 'cliente') conduzirDisparo(data.campaign_id);
   } catch (e) { alert(e.message); }
+}
+
+// Quando o servidor não consegue tocar o envio sozinho (função serverless que não pode
+// chamar a si mesma), é esta aba que pede os lotes: ela tem a sessão que passa pela
+// proteção do deployment. Fechar a página pausa o envio — o botão "Retomar pendentes"
+// continua de onde parou, sem reenviar para quem já recebeu.
+async function conduzirDisparo(id) {
+  if (state.conduzindo === id) return;
+  state.conduzindo = id;
+  try {
+    while (state.conduzindo === id) {
+      const status = await api(`/api/campaigns/${id}/run`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ time_budget_s: 60 })
+      });
+      if (!status || !status.pending) break;
+      if (['finished', 'cancelled', 'interrupted'].includes(status.status)) break;
+    }
+  } catch (e) {
+    if (state.campaignId === id) {
+      $('progAlert').innerHTML =
+        `<div class="alert a-err">O envio parou: ${esc(e.message)}. Use "Retomar pendentes" para continuar.</div>`;
+    }
+  } finally {
+    if (state.conduzindo === id) state.conduzindo = null;
+  }
 }
 
 // Abre o painel de acompanhamento de qualquer campanha (nova, em andamento ou já encerrada).
@@ -938,6 +965,7 @@ function alertaDaCampanha(data) {
 
 $('cancelBtn').addEventListener('click', async () => {
   if (!state.campaignId || !confirm('Cancelar o envio? As mensagens já enviadas não voltam atrás.')) return;
+  state.conduzindo = null;  // para o laço de lotes desta aba junto com a execução no servidor
   try { await api('/api/campaigns/' + state.campaignId + '/cancel', { method: 'POST' }); } catch (e) { alert(e.message); }
 });
 
@@ -947,6 +975,7 @@ $('retryBtn').addEventListener('click', async () => {
     const data = await api('/api/campaigns/' + state.campaignId + '/retry', { method: 'POST' });
     state.campaignId = data.campaign_id;
     startPolling();
+    if (data.started_by === 'cliente') conduzirDisparo(data.campaign_id);
   } catch (e) { alert(e.message); }
 });
 
@@ -976,6 +1005,7 @@ $('resumeBtn').addEventListener('click', async () => {
       body: JSON.stringify({ rate: taxa })
     });
     abrirCampanha(data.campaign_id, { scroll: true });
+    if (data.started_by === 'cliente') conduzirDisparo(data.campaign_id);
     loadHistory();
   } catch (e) { alert(e.message); }
 });

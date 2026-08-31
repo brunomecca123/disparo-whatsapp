@@ -35,6 +35,10 @@ TENTATIVAS_RITMO = 4
 ORCAMENTO_PADRAO_S = float(os.getenv("TIME_BUDGET_S") or 0) or None
 MARGEM_GRAVACAO_S = 8.0
 
+# Cada lote conduzido pelo navegador cabe folgado no teto da plataforma e dá retorno
+# rápido na tela, em vez de uma requisição única de vários minutos.
+LOTE_CLIENTE_S = 60.0
+
 LOTE_GRAVACAO = 100   # resultados por POST
 LOTE_LEITURA = 2000   # pendentes lidos por vez
 
@@ -159,6 +163,10 @@ def _tempo_esgotado(estado: Dict) -> bool:
 
 
 def _parar(estado: Dict) -> bool:
+    # O cancelamento é consultado aqui, e não só entre blocos: cada envio passa por esta
+    # checagem, então clicar em cancelar interrompe na mensagem seguinte, não 100 depois.
+    if not estado["parar"] and estado.get("campaign_id") in _cancelados:
+        estado["parar"] = True
     return estado["parar"] or _tempo_esgotado(estado)
 
 
@@ -249,6 +257,7 @@ def executar(campaign_id: str, time_budget_s: Optional[float] = None) -> Optiona
     workers = max(_workers_para(taxa), min(MAX_WORKERS, _workers_para(TAXA_PADRAO) * 2))
     inicio = time.monotonic()
     estado = {
+        "campaign_id": campaign_id,
         "parar": False,
         "estourou": False,
         "limite": inicio + float(orcamento) - MARGEM_GRAVACAO_S if orcamento else None,
@@ -349,15 +358,21 @@ def token_interno() -> str:
 def _url_base() -> Optional[str]:
     if os.getenv("APP_URL"):
         return os.getenv("APP_URL").rstrip("/")
-    # A URL do próprio deployment: a invocação seguinte roda exatamente este mesmo código.
-    host = os.getenv("VERCEL_URL") or os.getenv("VERCEL_PROJECT_PRODUCTION_URL")
+    # O domínio de produção vem primeiro de propósito: a proteção padrão da Vercel libera
+    # ele e bloqueia a URL com hash do deployment, que responderia 302 para a tela de login.
+    host = os.getenv("VERCEL_PROJECT_PRODUCTION_URL") or os.getenv("VERCEL_URL")
     return f"https://{host}" if host else None
+
+
+_ultima_falha_agendamento: Optional[str] = None
 
 
 def _agendar_execucao(campaign_id: str, time_budget_s: Optional[float] = None) -> bool:
     """Pede a outra invocação que continue o disparo, sem esperar ela terminar."""
+    global _ultima_falha_agendamento
     base = _url_base()
     if not base:
+        _ultima_falha_agendamento = "sem URL: defina APP_URL"
         return False
     try:
         # Sessão sem retry de propósito: uma re-tentativa aqui poderia pôr duas invocações
@@ -369,17 +384,31 @@ def _agendar_execucao(campaign_id: str, time_budget_s: Optional[float] = None) -
         if bypass:
             cabecalhos["x-vercel-protection-bypass"] = bypass
             cabecalhos["x-vercel-set-bypass-cookie"] = "false"
-        requests.post(
+        resposta = requests.post(
             f"{base}/api/internal/run",
             json={"campaign_id": campaign_id, "time_budget_s": time_budget_s},
             headers=cabecalhos,
             timeout=(5, 1.5),
+            # Sem seguir redirect: a tela de login da Deployment Protection responde 302 e,
+            # seguida, devolveria um 200 que faria a chamada bloqueada passar por sucesso.
+            allow_redirects=False,
         )
-        return True
     except requests.exceptions.ReadTimeout:
+        _ultima_falha_agendamento = None
         return True  # esperado: o pedido chegou, a resposta é que não interessa
-    except Exception:
+    except Exception as erro:
+        _ultima_falha_agendamento = f"{type(erro).__name__}: {erro}"[:200]
         return False
+
+    if resposta.status_code >= 300:
+        _ultima_falha_agendamento = (
+            f"HTTP {resposta.status_code} em {base}/api/internal/run"
+            + (" — deployment protegido: configure VERCEL_AUTOMATION_BYPASS_SECRET"
+               if resposta.status_code in (301, 302, 307, 308, 401, 403) else "")
+        )
+        return False
+    _ultima_falha_agendamento = None
+    return True
 
 
 def _execucao_viva(campanha: Dict) -> bool:
@@ -408,6 +437,8 @@ def diagnostico() -> Dict:
         "serverless": SERVERLESS,
         "self_invoke_url": _url_base(),
         "time_budget_s": ORCAMENTO_PADRAO_S,
+        "tem_bypass": bool(os.getenv("VERCEL_AUTOMATION_BYPASS_SECRET")),
+        "ultima_falha_agendamento": _ultima_falha_agendamento,
     }
 
 
@@ -420,11 +451,12 @@ def start_campaign(campaign_id: str, time_budget_s: Optional[float] = None) -> s
     if SERVERLESS:
         if _agendar_execucao(campaign_id, time_budget_s):
             return "invocacao"
-        # Não deu para chamar a si mesma (sem URL, ou deployment protegido). Uma thread aqui
-        # morreria congelada com a função: enviar dentro da própria requisição é o único
-        # caminho que realmente entrega as mensagens.
-        executar(campaign_id, time_budget_s)
-        return "inline"
+        # Não deu para chamar a si mesma (sem URL, ou deployment protegido, que é o caso
+        # quando não há bypass de automação). Uma thread aqui morreria congelada junto com a
+        # função, e enviar tudo nesta requisição deixaria a interface travada sem retorno.
+        # Quem conduz então é o navegador: ele tem sessão para passar pela proteção e chama
+        # /api/campaigns/{id}/run um lote de cada vez, com o progresso vivo na tela.
+        return "cliente"
     threading.Thread(target=executar, args=(campaign_id, time_budget_s), daemon=True).start()
     return "thread"
 

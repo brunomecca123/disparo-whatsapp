@@ -119,6 +119,12 @@ O mesmo aplicativo roda como função serverless, com três diferenças que o c�
   continuar. Um `UPDATE` condicional no banco é a trava: duas invocações nunca disparam
   para os mesmos pendentes, e uma execução cortada pela plataforma é retomada quando o
   batimento (`heartbeat_at`) envelhece.
+- **Com Deployment Protection ligada**, a função não consegue chamar a si mesma (a proteção
+  responde 401 para a própria chamada). Sem o *Protection Bypass for Automation*, quem
+  conduz o envio é o navegador: a resposta do disparo vem como `started_by: "cliente"` e a
+  aba pede `POST /api/campaigns/{id}/run` em lotes de 60s até a fila acabar. Fechar a aba
+  pausa o envio; "Retomar pendentes" continua sem reenviar para quem já recebeu.
+  `GET /api/health` mostra o modo em uso e o motivo da última falha de agendamento.
 - **Mídia acima de 4,5 MB** (limite de corpo da requisição na Vercel) sobe do navegador
   direto para o bucket `media` do Supabase Storage por URL assinada; o servidor busca de
   lá e entrega à Meta. Vídeo de template chega a 16 MB e só passa por esse caminho.
