@@ -29,6 +29,22 @@
   .conn{margin-left:auto;font-size:13px;display:flex;align-items:center;gap:8px;opacity:.95}
   .dot{width:8px;height:8px;border-radius:50%;background:#9aa}
   .dot.on{background:var(--accent)} .dot.off{background:#e74c3c}
+  /* Qualidade do número: cor no cabeçalho e faixa de alerta quando não está verde. */
+  .qchip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+         font-weight:700;font-size:12px;letter-spacing:.3px;border:1px solid transparent}
+  .qchip .qdot{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .qchip.q-green{background:rgba(255,255,255,.14);color:#eafff2;border-color:rgba(255,255,255,.25)}
+  .qchip.q-yellow{background:#fff3cd;color:#7a5600;border-color:#e6c34a}
+  .qchip.q-red{background:#fdecea;color:#a4231b;border-color:#e88b83}
+  .qchip.q-unknown{background:rgba(255,255,255,.10);color:#e8e8ef;border-color:rgba(255,255,255,.2)}
+  .qbanner{border-radius:var(--radius);padding:14px 16px;margin:0 0 20px;border:1px solid;
+           border-left-width:6px;display:flex;gap:12px;align-items:flex-start;line-height:1.45}
+  .qbanner .qicon{font-size:20px;line-height:1.2}
+  .qbanner b{display:block;font-size:14px;margin-bottom:3px}
+  .qbanner.q-yellow{background:#fff8e6;border-color:#e6c34a;color:#6b4b00}
+  .qbanner.q-red{background:#fdecea;border-color:#d9483b;color:#8f1f18}
+  @keyframes qpulse{0%,100%{box-shadow:0 0 0 0 rgba(217,72,59,.35)}50%{box-shadow:0 0 0 7px rgba(217,72,59,0)}}
+  .qbanner.q-red{animation:qpulse 2s ease-out 3}
   main{max-width:1180px;margin:0 auto;padding:24px;display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
   @media(max-width:980px){main{grid-template-columns:1fr}}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px}
@@ -108,11 +124,13 @@
     <h1>Disparo<span>Mais</span></h1>
     <div class="tagline">Campanhas de WhatsApp</div>
   </div>
-  <div class="conn"><span class="dot" id="dot"></span><span id="connText">verificando conexão…</span></div>
+  <div class="conn"><span class="dot" id="dot"></span><span id="connText">verificando conexão…</span>
+    <span id="qualityChip"></span></div>
 </header>
 
 <main>
 <div>
+  <div id="qualityBanner"></div>
   <!-- 1. TEMPLATE -->
   <section class="card">
     <h2><span class="step">1</span>Template</h2>
@@ -246,7 +264,8 @@
 <script>
 const state = {
   templates: [], template: null, upload: null, mapping: {}, validation: null, campaign: null, historico: [],
-  headerMedia: null, campaignId: null, poll: null, samples: [], sampleIndex: 0
+  headerMedia: null, campaignId: null, poll: null, samples: [], sampleIndex: 0,
+  quality: null, phoneStatus: null
 };
 
 const $ = id => document.getElementById(id);
@@ -274,12 +293,68 @@ async function loadConnection() {
     }
     const conn = await api('/api/connection');
     $('dot').className = 'dot on';
-    $('connText').textContent = `${conn.display_phone_number} · ${conn.verified_name} · qualidade ${conn.quality_rating || '—'}`;
+    $('connText').textContent = `${conn.display_phone_number} · ${conn.verified_name}`;
+    state.quality = (conn.quality_rating || '').toUpperCase();
+    state.phoneStatus = (conn.status || '').toUpperCase();
+    renderQualidade(conn);
   } catch (e) {
     $('dot').className = 'dot off';
     $('connText').textContent = 'sem conexão com a Meta';
+    $('qualityChip').innerHTML = '';
+    $('qualityBanner').innerHTML = '';
   }
 }
+
+// A nota que a Meta dá ao número, a partir de quem bloqueia ou denuncia nas últimas 24h.
+// Ela decide o teto diário de envios e, no limite, se o número continua podendo disparar —
+// por isso fica no cabeçalho e vira faixa de alerta quando sai do verde.
+const QUALIDADE = {
+  GREEN: {
+    classe: 'q-green', rotulo: 'qualidade boa',
+  },
+  YELLOW: {
+    classe: 'q-yellow', rotulo: 'qualidade em alerta', icone: '⚠️',
+    titulo: 'Atenção: a qualidade do número caiu para AMARELO',
+    texto: 'Nas últimas 24h um número relevante de pessoas bloqueou ou denunciou suas mensagens. ' +
+           'Se cair para vermelho, seu limite diário de envios diminui. Segure disparos grandes, ' +
+           'confira se a lista é de quem realmente espera contato e revise o texto do template.',
+  },
+  RED: {
+    classe: 'q-red', rotulo: 'qualidade baixa', icone: '🚨',
+    titulo: 'Risco: a qualidade do número está VERMELHA',
+    texto: 'O número está em observação pela Meta. Se não melhorar em até 7 dias, o limite diário ' +
+           'cai um degrau e o envio pode ser restringido. Pause campanhas de marketing agora e ' +
+           'envie só para quem interage com você.',
+  },
+};
+
+const STATUS_NUMERO = {
+  FLAGGED: 'O número está sinalizado (flagged) pela Meta por baixa qualidade. Enquanto isso durar, ' +
+           'evite qualquer disparo de marketing.',
+  RESTRICTED: 'O número está restrito (restricted): ele atingiu o limite da janela atual e não envia ' +
+              'novas mensagens de marketing até o ciclo reiniciar.',
+};
+
+function renderQualidade(conn) {
+  const nota = (conn.quality_rating || '').toUpperCase();
+  const info = QUALIDADE[nota] || { classe: 'q-unknown', rotulo: 'qualidade indefinida' };
+  const tier = conn.messaging_limit_tier ? ` · ${esc(String(conn.messaging_limit_tier).replace('TIER_', '').toLowerCase())}/dia` : '';
+  $('qualityChip').innerHTML =
+    `<span class="qchip ${info.classe}" title="Qualidade do número na Meta"><span class="qdot"></span>${esc(info.rotulo)}${tier}</span>`;
+
+  const statusAviso = STATUS_NUMERO[(conn.status || '').toUpperCase()];
+  if (!info.titulo && !statusAviso) { $('qualityBanner').innerHTML = ''; return; }
+  const classe = (nota === 'RED' || statusAviso) ? 'q-red' : 'q-yellow';
+  const titulo = info.titulo || 'Atenção com o status do número';
+  const texto = [info.texto, statusAviso].filter(Boolean).join(' ');
+  $('qualityBanner').innerHTML =
+    `<div class="qbanner ${classe}"><span class="qicon">${info.icone || '🚨'}</span>
+       <div><b>${esc(titulo)}</b>${esc(texto)}
+       <div style="margin-top:6px;font-size:12px;opacity:.85">Número ${esc(conn.display_phone_number || '')} · a nota se recupera sozinha quando as próximas campanhas forem bem recebidas.</div></div></div>`;
+}
+
+// A nota muda ao longo do dia (janela de 24h): reconferir evita disparar com dado velho.
+setInterval(loadConnection, 5 * 60 * 1000);
 
 // ----------------------------------------------------------------- templates
 async function loadTemplates() {
@@ -706,6 +781,12 @@ function campaignPayload(extra = {}) {
 }
 
 async function startCampaign(payload, confirmText) {
+  // Com o número em vermelho, cada disparo de marketing empurra a conta para a restrição:
+  // vale interromper o fluxo e obrigar uma confirmação consciente.
+  if (state.quality === 'RED' && !payload.dry_run && !confirm(
+      'A qualidade do seu número está VERMELHA.\n\n' +
+      'Disparar agora pode derrubar seu limite diário de envios e levar o número à restrição. ' +
+      'O recomendado é aguardar a nota se recuperar.\n\nDisparar mesmo assim?')) return;
   if (confirmText && !confirm(confirmText)) return;
   try {
     const data = await api('/api/campaigns', {

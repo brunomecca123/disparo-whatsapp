@@ -134,8 +134,19 @@ def _base() -> str:
 
 
 def check_connection() -> Dict:
-    """Valida token e phone id, devolvendo os dados do número conectado."""
-    response = SESSION.get(f"{_base()}/{settings.phone_id}", headers=_headers(), timeout=20)
+    """Valida token e phone id, devolvendo os dados do número conectado.
+
+    A qualidade e o status vêm daqui: são o que diz se o número está saudável, em
+    observação ou restrito — e a interface avisa em cima disso antes de qualquer disparo.
+    """
+    response = SESSION.get(
+        f"{_base()}/{settings.phone_id}",
+        headers=_headers(),
+        # messaging_limit_tier nem sempre é devolvido (depende da conta): tratamos como opcional.
+        params={"fields": "id,display_phone_number,verified_name,quality_rating,"
+                          "throughput,status,messaging_limit_tier"},
+        timeout=20,
+    )
     _raise_for_error(response)
     data = response.json()
     return {
@@ -144,6 +155,8 @@ def check_connection() -> Dict:
         "verified_name": data.get("verified_name"),
         "quality_rating": data.get("quality_rating"),
         "throughput": (data.get("throughput") or {}).get("level"),
+        "status": data.get("status"),
+        "messaging_limit_tier": data.get("messaging_limit_tier"),
     }
 
 
