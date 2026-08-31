@@ -256,28 +256,38 @@ def list_templates() -> List[Dict]:
 # --------------------------------------------------------------------- mídia
 
 
+def _mime(nome: str, media_type: str) -> str:
+    mime_type, _ = mimetypes.guess_type(nome)
+    return mime_type or {
+        "image": "image/jpeg",
+        "video": "video/mp4",
+        "document": "application/pdf",
+    }.get(media_type, "application/octet-stream")
+
+
 def upload_media(file_path: str, media_type: str = "image") -> str:
     """Sobe um arquivo local para o Meta e devolve o media id."""
     caminho = Path(file_path)
     if not caminho.exists():
         raise MetaApiError(f"Arquivo não encontrado: {file_path}")
 
-    mime_type, _ = mimetypes.guess_type(str(caminho))
-    if not mime_type:
-        mime_type = {
-            "image": "image/jpeg",
-            "video": "video/mp4",
-            "document": "application/pdf",
-        }.get(media_type, "application/octet-stream")
-
     with caminho.open("rb") as arquivo:
-        response = SESSION.post(
-            f"{_base()}/{settings.phone_id}/media",
-            headers=_headers(),
-            data={"messaging_product": "whatsapp"},
-            files={"file": (caminho.name, arquivo, mime_type)},
-            timeout=600,
-        )
+        return _postar_media(caminho.name, arquivo, _mime(caminho.name, media_type))
+
+
+def upload_media_bytes(nome: str, dados: bytes, media_type: str = "image") -> str:
+    """Mesma coisa, mas a partir do conteúdo em memória (arquivo vindo do Storage)."""
+    return _postar_media(nome, dados, _mime(nome, media_type))
+
+
+def _postar_media(nome: str, conteudo, mime_type: str) -> str:
+    response = SESSION.post(
+        f"{_base()}/{settings.phone_id}/media",
+        headers=_headers(),
+        data={"messaging_product": "whatsapp"},
+        files={"file": (nome, conteudo, mime_type)},
+        timeout=600,
+    )
     _raise_for_error(response)
     return response.json().get("id", "")
 

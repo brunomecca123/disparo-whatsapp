@@ -153,6 +153,25 @@ def _parar(estado: Dict) -> bool:
     return estado["parar"] or _tempo_esgotado(estado)
 
 
+def _resultado(campanha: Dict, item: Dict, desfecho: Dict) -> Dict:
+    """Monta a linha do upsert em /recipients.
+
+    Vai completa de propósito: o upsert do PostgREST é um INSERT ... ON CONFLICT, e o
+    Postgres valida os NOT NULL ao montar a tupla, antes de detectar o conflito. Mandar
+    só as colunas do desfecho faria a gravação estourar em campaign_id/idx/phone.
+    """
+    return {
+        "id": item["id"],
+        "campaign_id": campanha["id"],
+        "idx": item["idx"],
+        "phone": item["phone"],
+        "original": item.get("original"),
+        "vars": item.get("vars") or {},
+        "sent_at": _agora(),
+        **desfecho,
+    }
+
+
 def _enviar_item(campanha: Dict, item: Dict, ritmo: _Ritmo, estado: Dict) -> Optional[Dict]:
     """Envia um destinatário respeitando o ritmo, com re-tentativa quando é rate limit.
 
@@ -178,21 +197,19 @@ def _enviar_item(campanha: Dict, item: Dict, ritmo: _Ritmo, estado: Dict) -> Opt
                 )
                 desfecho = {"status": "sent", "message_id": resposta["message_id"], "error": None}
             ritmo.acelerar()
-            return {"id": item["id"], "sent_at": _agora(), **desfecho}
+            return _resultado(campanha, item, desfecho)
         except meta_api.MetaApiError as erro:
             if erro.rate_limited and tentativa < TENTATIVAS_RITMO:
                 ritmo.frear(pausa=2.0 * tentativa)
                 continue  # não conta como falha: o mesmo contato será tentado de novo
-            return {
-                "id": item["id"], "status": "failed", "message_id": None,
+            return _resultado(campanha, item, {
+                "status": "failed", "message_id": None,
                 "error": f"[{erro.code}] {erro.message}" if erro.code else erro.message,
-                "sent_at": _agora(),
-            }
+            })
         except Exception as erro:  # falha de rede, timeout etc.
-            return {
-                "id": item["id"], "status": "failed", "message_id": None,
-                "error": str(erro), "sent_at": _agora(),
-            }
+            return _resultado(campanha, item, {
+                "status": "failed", "message_id": None, "error": str(erro),
+            })
     return None
 
 

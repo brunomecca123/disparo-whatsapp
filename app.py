@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from core import campaign as campaign_service
-from core import contacts, db, meta_api
+from core import contacts, db, meta_api, storage
 from core.settings import BASE_DIR, UPLOAD_DIR, settings
 
 app = FastAPI(title="DisparoMais", docs_url=None, redoc_url=None)
@@ -266,7 +266,7 @@ def preview_contacts(payload: PreviewPayload):
 
 @app.post("/api/media/upload")
 async def upload_media(file: UploadFile = File(...), media_type: str = Form("image")):
-    UPLOAD_DIR.mkdir(exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     destino = UPLOAD_DIR / f"{uuid.uuid4().hex[:8]}_{file.filename}"
     destino.write_bytes(await file.read())
     try:
@@ -276,6 +276,56 @@ async def upload_media(file: UploadFile = File(...), media_type: str = Form("ima
     finally:
         destino.unlink(missing_ok=True)
     return {"media_id": media_id, "media_type": media_type, "filename": file.filename}
+
+
+class MediaSignPayload(BaseModel):
+    filename: str
+    media_type: str = "image"
+    size: Optional[int] = None
+
+
+@app.post("/api/media/sign")
+def assinar_upload_media(payload: MediaSignPayload):
+    """Devolve uma URL assinada para o navegador subir o arquivo direto ao Supabase Storage.
+
+    Caminho usado para arquivos grandes: na Vercel a função recebe no máximo 4,5 MB por
+    requisição, e um vídeo de template chega a 16 MB.
+    """
+    if payload.size and payload.size > storage.LIMITE_BUCKET_BYTES:
+        raise HTTPException(400, f"Arquivo maior que o limite do Storage ({storage.LIMITE_BUCKET_BYTES // (1024 * 1024)} MB).")
+    try:
+        assinatura = storage.assinar_upload(payload.filename)
+    except (storage.StorageError, db.DbError) as erro:
+        raise HTTPException(400, str(erro))
+    return {
+        **assinatura,
+        "content_type": storage.content_type(payload.filename, payload.media_type),
+        "filename": payload.filename,
+    }
+
+
+class MediaFromStoragePayload(BaseModel):
+    path: str
+    filename: str = ""
+    media_type: str = "image"
+
+
+@app.post("/api/media/from-storage")
+def enviar_media_do_storage(payload: MediaFromStoragePayload):
+    """Busca no Storage o arquivo que o navegador subiu e repassa para a Meta."""
+    try:
+        dados = storage.baixar(payload.path)
+    except (storage.StorageError, db.DbError) as erro:
+        raise HTTPException(400, str(erro))
+    nome = payload.filename or payload.path.split("/")[-1]
+    try:
+        media_id = meta_api.upload_media_bytes(nome, dados, payload.media_type)
+    except meta_api.MetaApiError as erro:
+        return _erro_meta(erro)
+    finally:
+        # O Storage é só um repasse: com o media id em mãos o objeto não serve mais.
+        storage.remover(payload.path)
+    return {"media_id": media_id, "media_type": payload.media_type, "filename": nome}
 
 
 # ------------------------------------------------------------------- campanhas

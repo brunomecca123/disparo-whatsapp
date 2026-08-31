@@ -587,17 +587,67 @@ function renderPreview(sample) {
 }
 
 // ------------------------------------------------------------------- mídia
+// Acima deste tamanho o arquivo não passa pela função (a Vercel corta o corpo da
+// requisição em 4,5 MB): sobe direto para o Supabase Storage e o servidor busca de lá.
+const LIMITE_UPLOAD_DIRETO = 4 * 1024 * 1024;
+// Limites da própria Meta por tipo de header.
+const LIMITE_META = { image: 5 * 1024 * 1024, video: 16 * 1024 * 1024, document: 100 * 1024 * 1024 };
+const MB = bytes => (bytes / (1024 * 1024)).toFixed(1).replace('.', ',') + ' MB';
+
+function enviarComProgresso(url, file, contentType, aoProgredir) {
+  // XHR e não fetch: só ele reporta progresso, e um vídeo de 16 MB sem barra parece travado.
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) aoProgredir(e.loaded / e.total);
+    });
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300)
+      ? resolve()
+      : reject(new Error(`falha ao subir o arquivo (HTTP ${xhr.status})`));
+    xhr.onerror = () => reject(new Error('falha de rede ao subir o arquivo'));
+    xhr.send(file);
+  });
+}
+
 $('mediaFile').addEventListener('change', async event => {
   const file = event.target.files[0];
   if (!file || !state.template) return;
   const type = state.template.header.format.toLowerCase();
   $('mediaFileText').innerHTML = '<b>' + esc(file.name) + '</b> — clique para trocar';
-  const form = new FormData();
-  form.append('file', file);
-  form.append('media_type', type);
-  $('mediaStatus').innerHTML = 'Subindo arquivo para o Meta… <span class="spin" style="border-color:#ccc;border-top-color:#4a1f77"></span>';
+  const spin = '<span class="spin" style="border-color:#ccc;border-top-color:#4a1f77"></span>';
+
+  const teto = LIMITE_META[type];
+  if (teto && file.size > teto) {
+    $('mediaStatus').innerHTML = `<span class="badge b-err">erro</span> ${esc(file.name)} tem ${MB(file.size)};
+      o WhatsApp aceita no máximo ${MB(teto)} para header de ${esc(type)}.`;
+    return;
+  }
+
   try {
-    const data = await api('/api/media/upload', { method: 'POST', body: form });
+    let data;
+    if (file.size <= LIMITE_UPLOAD_DIRETO) {
+      $('mediaStatus').innerHTML = 'Subindo arquivo para o Meta… ' + spin;
+      const form = new FormData();
+      form.append('file', file);
+      form.append('media_type', type);
+      data = await api('/api/media/upload', { method: 'POST', body: form });
+    } else {
+      $('mediaStatus').innerHTML = `Preparando envio de ${MB(file.size)}… ` + spin;
+      const assinatura = await api('/api/media/sign', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, media_type: type, size: file.size })
+      });
+      await enviarComProgresso(assinatura.upload_url, file, assinatura.content_type, fracao => {
+        $('mediaStatus').innerHTML = `Enviando ${MB(file.size)}… <b>${Math.round(fracao * 100)}%</b> ` + spin;
+      });
+      $('mediaStatus').innerHTML = 'Entregando o arquivo ao Meta… ' + spin;
+      data = await api('/api/media/from-storage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: assinatura.path, filename: file.name, media_type: type })
+      });
+    }
     state.headerMedia = { type, [type]: { id: data.media_id } };
     $('mediaStatus').innerHTML = `<span class="badge b-ok">ok</span> media id <span class="mono">${esc(data.media_id)}</span>`;
     renderPreview(state.samples[state.sampleIndex] || null);
