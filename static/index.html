@@ -303,10 +303,12 @@ async function loadTemplates() {
     if (saveBtn) saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true; saveBtn.textContent = 'Salvando…';
       try {
-        await api('/api/config/waba', {
+        const resp = await api('/api/config/waba', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ waba_id: $('wabaInput').value })
         });
+        // Na Vercel o ID vale só para esta requisição: quem guarda é a plataforma.
+        if (resp && resp.warning) $('tplError').innerHTML = `<div class="alert a-warn">${esc(resp.warning)}</div>`;
         loadTemplates();
       } catch (err) {
         $('tplError').innerHTML = `<div class="alert a-err">${esc(err.message)}</div>`;

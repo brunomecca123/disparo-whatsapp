@@ -32,6 +32,11 @@ create table if not exists campaigns (
   parent_id     text        references campaigns(id) on delete set null,
   resumed_by    text,
 
+  -- Batimento da execução em andamento. Em serverless cada lote roda numa invocação
+  -- diferente: sem isto, uma invocação cortada pela plataforma deixaria a campanha
+  -- presa em 'running' e ninguém poderia retomá-la.
+  heartbeat_at   timestamptz,
+
   created_at     timestamptz not null default now(),
   started_at     timestamptz,
   finished_at    timestamptz,
@@ -40,6 +45,7 @@ create table if not exists campaigns (
 
 create index if not exists campaigns_created_idx on campaigns (created_at desc);
 create index if not exists campaigns_status_idx  on campaigns (status);
+create index if not exists campaigns_heartbeat_idx on campaigns (status, heartbeat_at);
 
 -- ------------------------------------------------------------ destinatários
 -- "values" é palavra reservada no Postgres: a coluna com as variáveis chama-se vars.

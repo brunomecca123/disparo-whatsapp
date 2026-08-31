@@ -7,6 +7,7 @@ Postgres esbarra em pool/cold start, e o projeto já depende de requests.
 
 import os
 from typing import Dict, List, Optional
+from urllib.parse import quote
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -88,11 +89,42 @@ def inserir_campanha(campanha: Dict) -> Dict:
     return linhas[0] if linhas else campanha
 
 
-def atualizar_campanha(campaign_id: str, campos: Dict) -> None:
+def atualizar_campanha(campaign_id: str, campos: Dict, retornar: bool = False) -> Optional[Dict]:
+    """Atualiza a campanha. Com retornar=True devolve a linha já gravada.
+
+    O retorno é como a execução descobre, sem requisição extra, que alguém cancelou ou
+    mudou o ritmo — em serverless quem cancela está em outra invocação, fora deste processo.
+    """
     if not campos:
-        return
-    _pedir("PATCH", f"/campaigns?id=eq.{campaign_id}", json=campos,
-           extra_headers={"Prefer": "return=minimal"})
+        return None
+    resposta = _pedir(
+        "PATCH", f"/campaigns?id=eq.{campaign_id}", json=campos,
+        extra_headers={"Prefer": "return=representation" if retornar else "return=minimal"},
+    )
+    linhas = _linhas(resposta) if retornar else []
+    return linhas[0] if linhas else None
+
+
+def assumir_campanha(campaign_id: str, limite_heartbeat: str) -> Optional[Dict]:
+    """Marca a campanha como 'running' e devolve a linha — ou None se outra execução já a tem.
+
+    O UPDATE condicional é a trava: o Postgres resolve o WHERE atomicamente, então duas
+    invocações simultâneas nunca disparam para os mesmos pendentes. Um heartbeat velho
+    libera a campanha, que é como uma execução cortada no meio volta a ser retomável.
+    """
+    filtro = (
+        f"/campaigns?id=eq.{campaign_id}"
+        # Só campanha viva: nunca reabre uma que já terminou ou foi cancelada.
+        f"&status=in.(pending,paused,interrupted,running)"
+        # Se já está 'running', só assume quando o batimento sumiu — ou seja, quem rodava morreu.
+        # quote: sem isso o "+" do fuso viraria espaço na querystring e o Postgres recusaria a data.
+        f"&or=(status.neq.running,heartbeat_at.is.null,"
+        f"heartbeat_at.lt.{quote(limite_heartbeat, safe='')})"
+    )
+    resposta = _pedir("PATCH", filtro, json={"status": "running", "heartbeat_at": "now"},
+                      extra_headers={"Prefer": "return=representation"})
+    linhas = _linhas(resposta)
+    return linhas[0] if linhas else None
 
 
 def buscar_campanha(campaign_id: str) -> Optional[Dict]:

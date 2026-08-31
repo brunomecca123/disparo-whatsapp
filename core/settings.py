@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
+
+# Na Vercel o código roda em função serverless: filesystem somente leitura (fora de /tmp)
+# e processo congelado assim que a resposta sai.
+SERVERLESS = bool(os.getenv("VERCEL"))
 # Na Vercel o filesystem e somente leitura, menos /tmp; local fica na raiz do projeto.
 UPLOAD_DIR = Path("/tmp/uploads") if os.getenv("VERCEL") else BASE_DIR / "uploads"
 

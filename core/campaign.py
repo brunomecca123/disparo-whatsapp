@@ -7,16 +7,20 @@ deploy, timeout da função, app encerrado —, os pendentes continuam pendentes
 próxima execução retoma de onde parou.
 """
 
+import hashlib
 import math
 import os
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
+import requests
+
 from core import db, meta_api
+from core.settings import SERVERLESS
 
 # A Meta entrega 80 mensagens/segundo por número no nível STANDARD. Trabalhamos bem abaixo
 # disso: o teto da interface é conservador e o motor freia sozinho se ela reclamar (130429).
@@ -33,6 +37,11 @@ MARGEM_GRAVACAO_S = 8.0
 
 LOTE_GRAVACAO = 100   # resultados por POST
 LOTE_LEITURA = 2000   # pendentes lidos por vez
+
+# Na Vercel a função é congelada assim que responde: uma thread de fundo morre junto.
+# O envio então roda dentro da requisição e, quando o tempo acaba, a invocação chama a si
+# mesma para continuar de onde parou — sem depender do navegador ficar aberto.
+HEARTBEAT_TOLERANCIA_S = 120.0  # sem batimento por este tempo, a execução é dada como morta
 
 _ritmos: Dict[str, "_Ritmo"] = {}
 _cancelados = set()
@@ -220,6 +229,11 @@ def _blocos(itens: List, tamanho: int):
 
 def executar(campaign_id: str, time_budget_s: Optional[float] = None) -> Optional[Dict]:
     """Envia o que couber no orçamento de tempo. Pode ser chamada quantas vezes for preciso."""
+    limite_batimento = (datetime.now(timezone.utc) - timedelta(seconds=HEARTBEAT_TOLERANCIA_S)).isoformat()
+    if not db.assumir_campanha(campaign_id, limite_batimento):
+        # Ou já terminou, ou outra execução está com ela: sair sem enviar nada é o certo.
+        return db.buscar_campanha(campaign_id)
+
     campanha = db.buscar_campanha(campaign_id)
     if not campanha:
         raise ValueError("campanha não encontrada")
@@ -244,7 +258,7 @@ def executar(campaign_id: str, time_budget_s: Optional[float] = None) -> Optiona
     base_failed = campanha["failed"]
     base_processed = campanha["processed"]
     db.atualizar_campanha(campaign_id, {
-        "status": "running", "stop_reason": None, "workers": workers, "rate": taxa,
+        "stop_reason": None, "workers": workers, "rate": taxa,
         "started_at": campanha.get("started_at") or _agora(), "finished_at": None,
     })
 
@@ -270,13 +284,21 @@ def executar(campaign_id: str, time_budget_s: Optional[float] = None) -> Optiona
                     falhas += sum(1 for r in resultados if r["status"] == "failed")
                     processados += len(resultados)
                     decorrido = max(0.001, time.monotonic() - inicio)
-                    db.atualizar_campanha(campaign_id, {
+                    # O retorno traz a linha já gravada: é assim que esta execução fica
+                    # sabendo de um cancelamento ou de uma troca de ritmo feita em outro
+                    # processo (na Vercel, quem clica em cancelar cai em outra invocação).
+                    atual = db.atualizar_campanha(campaign_id, {
                         "sent": base_sent + enviados,
                         "failed": base_failed + falhas,
                         "processed": base_processed + processados,
                         "rate_real": round(processados / decorrido, 2),
                         "freios": (campanha.get("freios") or 0) + ritmo.freios,
-                    })
+                        "heartbeat_at": "now",
+                    }, retornar=True) or {}
+                    if atual.get("status") == "cancelled":
+                        estado["parar"] = True
+                    elif atual.get("rate") is not None and float(atual["rate"]) != ritmo.base:
+                        ritmo.ajustar(float(atual["rate"]))
     finally:
         with _lock:
             _ritmos.pop(campaign_id, None)
@@ -300,12 +322,70 @@ def executar(campaign_id: str, time_budget_s: Optional[float] = None) -> Optiona
         "freios": (campanha.get("freios") or 0) + ritmo.freios,
         "rate_real": round(processados / decorrido, 2),
         "finished_at": _agora(),
+        # Solta a trava: sem batimento, a próxima invocação pode assumir a fila que sobrou.
+        "heartbeat_at": None,
     })
+
+    # Estado final gravado antes de chamar a próxima invocação: assim as duas nunca se
+    # sobrepõem — quem entra encontra a campanha liberada e o progresso já salvo.
+    if status == "paused" and SERVERLESS:
+        _agendar_execucao(campaign_id, time_budget_s)
     return db.buscar_campanha(campaign_id)
 
 
+# ------------------------------------------------- execução em outra invocação
+
+
+def token_interno() -> str:
+    """Segredo compartilhado entre as invocações, derivado de uma chave que já existe.
+
+    Evita mais uma variável de ambiente para configurar, e o hash não permite voltar à
+    service key. Só serve para a função provar a si mesma que a chamada veio dela.
+    """
+    chave = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or ""
+    return hashlib.sha256(f"disparo-interno:{chave}".encode()).hexdigest()
+
+
+def _url_base() -> Optional[str]:
+    if os.getenv("APP_URL"):
+        return os.getenv("APP_URL").rstrip("/")
+    # A URL do próprio deployment: a invocação seguinte roda exatamente este mesmo código.
+    host = os.getenv("VERCEL_URL") or os.getenv("VERCEL_PROJECT_PRODUCTION_URL")
+    return f"https://{host}" if host else None
+
+
+def _agendar_execucao(campaign_id: str, time_budget_s: Optional[float] = None) -> bool:
+    """Pede a outra invocação que continue o disparo, sem esperar ela terminar."""
+    base = _url_base()
+    if not base:
+        return False
+    try:
+        # Sessão sem retry de propósito: uma re-tentativa aqui poderia pôr duas invocações
+        # na mesma campanha. A trava do banco barraria a segunda, mas nem chegamos lá.
+        cabecalhos = {"x-internal-token": token_interno()}
+        # Deployment Protection (padrão em preview) barraria a chamada da função para ela
+        # mesma; o segredo de automação da própria Vercel é o jeito oficial de passar.
+        bypass = os.getenv("VERCEL_AUTOMATION_BYPASS_SECRET")
+        if bypass:
+            cabecalhos["x-vercel-protection-bypass"] = bypass
+            cabecalhos["x-vercel-set-bypass-cookie"] = "false"
+        requests.post(
+            f"{base}/api/internal/run",
+            json={"campaign_id": campaign_id, "time_budget_s": time_budget_s},
+            headers=cabecalhos,
+            timeout=(5, 1.5),
+        )
+        return True
+    except requests.exceptions.ReadTimeout:
+        return True  # esperado: o pedido chegou, a resposta é que não interessa
+    except Exception:
+        return False
+
+
 def start_campaign(campaign_id: str, time_budget_s: Optional[float] = None):
-    """Modo local: dispara numa thread para a interface não travar."""
+    """Local: thread, para a interface não travar. Vercel: outra invocação assume o envio."""
+    if SERVERLESS and _agendar_execucao(campaign_id, time_budget_s):
+        return
     threading.Thread(target=executar, args=(campaign_id, time_budget_s), daemon=True).start()
 
 

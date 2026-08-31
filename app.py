@@ -6,19 +6,20 @@ Uso:
     ./venv/bin/python app.py        (abre em http://127.0.0.1:8777)
 """
 
+import hmac
 import re
 import uuid
 import webbrowser
 from typing import Dict, List, Optional
 
 import uvicorn
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from core import campaign as campaign_service
 from core import contacts, db, meta_api, storage
-from core.settings import BASE_DIR, UPLOAD_DIR, settings
+from core.settings import BASE_DIR, SERVERLESS, UPLOAD_DIR, settings
 
 app = FastAPI(title="DisparoMais", docs_url=None, redoc_url=None)
 
@@ -120,6 +121,14 @@ def salvar_waba(payload: WabaPayload):
             erro.hint = "Esse ID não é de uma conta WhatsApp Business. Confira em WhatsApp Manager → Configurações da conta."
         return _erro_meta(erro)
 
+    if SERVERLESS:
+        # O .env não existe na função e o processo é descartado: só a plataforma persiste.
+        return {
+            "ok": True, "waba_id": waba_id, "templates": quantidade, "persisted": False,
+            "warning": "ID validado, mas aqui ele não fica salvo: cadastre WHATSAPP_WABA_ID "
+                       "em Settings → Environment Variables na Vercel e refaça o deploy.",
+        }
+
     env = BASE_DIR / ".env"
     linhas = env.read_text(encoding="utf-8").splitlines() if env.exists() else []
     nova = f"WHATSAPP_WABA_ID={waba_id}"
@@ -130,7 +139,7 @@ def salvar_waba(payload: WabaPayload):
     else:
         linhas.append(nova)
     env.write_text("\n".join(linhas) + "\n", encoding="utf-8")
-    return {"ok": True, "waba_id": waba_id, "templates": quantidade}
+    return {"ok": True, "waba_id": waba_id, "templates": quantidade, "persisted": True}
 
 
 @app.get("/api/connection")
@@ -411,6 +420,25 @@ def create_campaign(payload: CampaignPayload):
     )
     campaign_service.start_campaign(campanha["id"])
     return {"campaign_id": campanha["id"], "total": campanha["total"]}
+
+
+class InternalRunPayload(BaseModel):
+    campaign_id: str
+    time_budget_s: Optional[float] = None
+
+
+@app.post("/api/internal/run")
+def executar_lote(payload: InternalRunPayload, x_internal_token: str = Header(default="")):
+    """Executa um lote da campanha dentro desta requisição.
+
+    Só a própria aplicação chama isto: na Vercel, cada lote precisa de uma invocação nova,
+    porque a função é congelada assim que responde. A trava no banco garante que duas
+    invocações nunca disparem para os mesmos pendentes.
+    """
+    if not hmac.compare_digest(x_internal_token, campaign_service.token_interno()):
+        raise HTTPException(403, "token interno inválido")
+    campanha = campaign_service.executar(payload.campaign_id, payload.time_budget_s)
+    return {"ok": True, "status": (campanha or {}).get("status")}
 
 
 @app.get("/api/campaigns")

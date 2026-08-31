@@ -103,10 +103,27 @@ app.py                 rotas da aplicação web
 core/settings.py       credenciais lidas do .env
 core/meta_api.py       cliente da Graph API (templates, upload de mídia, envio)
 core/contacts.py       leitura de CSV/Excel e validação de telefones
-core/campaign.py       execução em background e histórico
+core/campaign.py       execução do disparo, ritmo e histórico
+core/db.py             estado no Supabase (campanhas, destinatários, uploads)
+core/storage.py        mídia grande: navegador → Supabase Storage → Meta
 static/index.html      interface
-campaigns/             histórico das campanhas em JSON (fora do git)
+api/index.py           ponto de entrada das funções da Vercel
 ```
+
+### Deploy na Vercel
+
+O mesmo aplicativo roda como função serverless, com três diferenças que o código já trata:
+
+- **Envio em lotes.** A função é congelada assim que responde, então o disparo roda dentro
+  da requisição até `TIME_BUDGET_S` (use `270`) e a invocação chama a si mesma para
+  continuar. Um `UPDATE` condicional no banco é a trava: duas invocações nunca disparam
+  para os mesmos pendentes, e uma execução cortada pela plataforma é retomada quando o
+  batimento (`heartbeat_at`) envelhece.
+- **Mídia acima de 4,5 MB** (limite de corpo da requisição na Vercel) sobe do navegador
+  direto para o bucket `media` do Supabase Storage por URL assinada; o servidor busca de
+  lá e entrega à Meta. Vídeo de template chega a 16 MB e só passa por esse caminho.
+- **Nada é gravado em disco:** arquivos temporários vão para `/tmp` e `WHATSAPP_WABA_ID`
+  precisa ser cadastrado em Settings → Environment Variables, não pela interface.
 
 ---
 
