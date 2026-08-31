@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Arquivos de dados sensíveis
+clientes.csv
+*.csv
+!clientes_exemplo.csv
+
+# Logs
+*.log
+
+# Configuração local (descomente se quiser ignorar o config.py)
+# config.py
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Credenciais e dados da campanha (app web)
+.env
+uploads/
+campaigns/
+blocklist.txt

@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DisparoMais — Campanhas de WhatsApp</title>
+<link rel="icon" type="image/png" href="/imagens/logos.png">
+<style>
+  :root{
+    --bg:#f2f4f7; --card:#fff; --ink:#111b21; --muted:#667781; --line:#e3e6e9;
+    --brand:#4a1f77; --brand-dark:#37155a; --accent:#25d366;
+    --marca-rosa:#ef1a63; --marca-roxo:#26093d; --marca-roxo-claro:#4a1f77;
+    --warn:#b26b00; --warn-bg:#fff6e5; --danger:#c0392b; --danger-bg:#fdecea;
+    --ok:#1a7f4b; --ok-bg:#e8f6ee; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  /* Roxo da marca Locar Mais: do tom do logotipo para o tom da casa. */
+  header.top{background:linear-gradient(100deg,var(--marca-roxo) 0%,var(--marca-roxo-claro) 100%);
+             color:#fff;padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  /* A arte tem margem transparente própria; as margens negativas encostam ela no texto. */
+  header.top .logo{height:58px;width:auto;display:block;margin:-6px -10px -6px -9px;flex:0 0 auto}
+  header.top .marca{display:flex;flex-direction:column;gap:1px}
+  header.top h1{font-size:18px;margin:0;font-weight:700;letter-spacing:-.2px;color:#fff}
+  header.top h1 span{color:#ff8fb1}
+  header.top .tagline{font-size:11px;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.6px}
+  @media(max-width:560px){header.top .logo{height:46px;margin:-5px -8px -5px -7px}}
+  .conn{margin-left:auto;font-size:13px;display:flex;align-items:center;gap:8px;opacity:.95}
+  .dot{width:8px;height:8px;border-radius:50%;background:#9aa}
+  .dot.on{background:var(--accent)} .dot.off{background:#e74c3c}
+  main{max-width:1180px;margin:0 auto;padding:24px;display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+  @media(max-width:980px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 14px;font-weight:600}
+  .card h2 .step{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--brand);color:#fff;
+                 align-items:center;justify-content:center;font-size:11px;margin-right:8px}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
+  select,input[type=text],input[type=number],textarea{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+  select:focus,input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:-1px;border-color:transparent}
+  textarea{min-height:110px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+  button{font:inherit;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;font-weight:600}
+  .btn{background:var(--brand);color:#fff} .btn:hover{background:var(--brand-dark)}
+  .btn-ghost{background:#eef1f3;color:var(--ink)} .btn-ghost:hover{background:#e2e6e9}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-big{width:100%;padding:14px;font-size:16px;color:#fff;
+           background:linear-gradient(100deg,var(--marca-roxo) 0%,var(--marca-roxo-claro) 100%)}
+  .btn-big:hover{filter:brightness(.95)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>*{flex:1;min-width:140px}
+  .tabs{display:flex;gap:6px;margin-bottom:8px}
+  .tab{padding:7px 14px;border-radius:999px;background:#eef1f3;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)}
+  .tab.active{background:var(--brand);color:#fff}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px}
+  .b-ok{background:var(--ok-bg);color:var(--ok)} .b-warn{background:var(--warn-bg);color:var(--warn)}
+  .b-err{background:var(--danger-bg);color:var(--danger)} .b-mute{background:#eef1f3;color:var(--muted)}
+  .alert{padding:11px 14px;border-radius:8px;font-size:13px;margin:10px 0}
+  .a-warn{background:var(--warn-bg);color:var(--warn)} .a-err{background:var(--danger-bg);color:var(--danger)}
+  .a-info{background:#f3eefb;color:var(--brand-dark)} .a-info a{color:var(--brand);font-weight:600}
+  .a-ok{background:var(--ok-bg);color:var(--ok)}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .phone{background:#e5ddd5;border-radius:12px;padding:16px;min-height:120px}
+  .bubble{background:#fff;border-radius:8px;padding:10px 12px;box-shadow:0 1px 1px rgba(0,0,0,.13);
+          white-space:pre-wrap;word-break:break-word;font-size:14px;position:relative}
+  .bubble .hd{font-weight:700;margin-bottom:6px}
+  .bubble .ft{color:var(--muted);font-size:12px;margin-top:8px}
+  .bubble .media{background:#f0f2f5;border-radius:6px;padding:22px;text-align:center;color:var(--muted);
+                 font-size:12px;margin-bottom:8px;border:1px dashed #c9ced3}
+  .btnrow{border-top:1px solid #e9edef;margin-top:8px;padding-top:6px;text-align:center;color:#0a7cff;font-size:13px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;margin:12px 0}
+  .stat{background:#f7f9fa;border-radius:8px;padding:10px;text-align:center}
+  .stat b{display:block;font-size:20px;line-height:1.2} .stat span{font-size:11px;color:var(--muted)}
+  .bar{height:10px;background:#e9edef;border-radius:999px;overflow:hidden;margin:10px 0}
+  .bar>div{height:100%;background:var(--accent);transition:width .3s}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .scroll{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .varmap{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:#fafbfc}
+  .varmap .k{font-family:ui-monospace,monospace;font-size:12px;color:var(--brand);font-weight:700}
+  .file{border:2px dashed #c9ced3;border-radius:10px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;font-size:13px}
+  .file:hover{border-color:var(--brand);color:var(--brand)}
+  .file input{display:none}
+  .switch{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);margin:10px 0}
+  .switch input{width:auto;margin:0}
+  .muted{color:var(--muted)} .mono{font-family:ui-monospace,monospace;font-size:12px}
+  .hidden{display:none!important}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);
+        border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .hist{display:flex;justify-content:space-between;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line);
+        font-size:13px;cursor:pointer;border-radius:6px}
+  .hist:last-child{border-bottom:0}
+  .hist:hover{background:#f7f9fa}
+  .hist.sel{background:#f3eefb;box-shadow:inset 3px 0 0 var(--brand)}
+  .hist .nome{font-weight:600;word-break:break-all}
+  .pulse{animation:pu 1.2s ease-in-out infinite}
+  @keyframes pu{50%{opacity:.35}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <img class="logo" src="/imagens/logos.png" alt="Locar Mais · Meta Business Partner">
+  <div class="marca">
+    <h1>Disparo<span>Mais</span></h1>
+    <div class="tagline">Campanhas de WhatsApp</div>
+  </div>
+  <div class="conn"><span class="dot" id="dot"></span><span id="connText">verificando conexão…</span></div>
+</header>
+
+<main>
+<div>
+  <!-- 1. TEMPLATE -->
+  <section class="card">
+    <h2><span class="step">1</span>Template</h2>
+    <div id="tplError"></div>
+    <div class="row">
+      <input type="text" id="tplSearch" placeholder="Filtrar por nome… (ex: ago_2026)">
+      <button class="btn-ghost" style="flex:0 0 auto;min-width:auto" id="tplReload">Recarregar</button>
+    </div>
+    <select id="tplSelect" style="margin-top:8px"><option value="">Carregando templates…</option></select>
+    <div class="hint" id="tplCount"></div>
+    <div id="tplInfo" class="hidden">
+      <div class="hint" id="tplMeta"></div>
+      <div id="mediaBox" class="hidden">
+        <label id="mediaLabel">Arquivo do header</label>
+        <div class="row">
+          <label class="file" style="flex:2">
+            <input type="file" id="mediaFile">
+            <span id="mediaFileText">Clique para escolher o arquivo e subir ao Meta</span>
+          </label>
+        </div>
+        <label>…ou cole uma URL pública (https)</label>
+        <input type="text" id="mediaUrl" placeholder="https://…">
+        <div id="mediaStatus" class="hint"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. CONTATOS -->
+  <section class="card">
+    <h2><span class="step">2</span>Contatos</h2>
+    <div class="tabs">
+      <div class="tab active" data-tab="file">Arquivo CSV / Excel</div>
+      <div class="tab" data-tab="paste">Colar telefones</div>
+    </div>
+
+    <div id="tabFile">
+      <label class="file">
+        <input type="file" id="contactsFile" accept=".csv,.xlsx,.xlsm,.txt">
+        <span id="contactsFileText"><b>Clique para escolher</b> um arquivo .csv ou .xlsx</span>
+      </label>
+    </div>
+
+    <div id="tabPaste" class="hidden">
+      <textarea id="pasteArea" placeholder="Um telefone por linha:&#10;44991628511&#10;11970470500"></textarea>
+      <button class="btn-ghost" id="pasteBtn" style="margin-top:8px">Usar esta lista</button>
+    </div>
+
+    <div id="loadInfo" class="hidden">
+      <div class="alert a-ok" id="loadSummary"></div>
+      <label>Coluna com o telefone</label>
+      <select id="phoneCol"></select>
+      <div id="varMapping"></div>
+      <label class="switch"><input type="checkbox" id="add9"> Adicionar o 9º dígito automaticamente em celulares antigos</label>
+      <button class="btn-ghost" id="validateBtn">Validar lista</button>
+    </div>
+  </section>
+
+  <!-- 3. VALIDAÇÃO -->
+  <section class="card hidden" id="validationCard">
+    <h2><span class="step">3</span>Validação</h2>
+    <div class="stats" id="valStats"></div>
+    <div id="valIssues"></div>
+  </section>
+
+  <!-- 4. DISPARO -->
+  <section class="card hidden" id="sendCard">
+    <h2><span class="step">4</span>Disparo</h2>
+    <div class="row">
+      <div>
+        <label>Velocidade (mensagens por segundo)</label>
+        <input type="number" id="rate" value="8" min="0.1" max="30" step="1">
+        <div class="hint" id="rateHint"></div>
+      </div>
+      <div>
+        <label>Enviar teste para (qualquer número)</label>
+        <input type="text" id="testPhone" placeholder="44991628511">
+      </div>
+    </div>
+    <label class="switch"><input type="checkbox" id="dryRun"> Modo simulação (não envia nada, só monta o payload)</label>
+    <div class="row" style="margin-top:12px">
+      <button class="btn-ghost" id="testBtn" style="flex:0 0 auto">Enviar teste</button>
+      <button class="btn-big" id="sendBtn">Disparar campanha</button>
+    </div>
+    <div class="hint" id="sendHint"></div>
+  </section>
+
+  <!-- 5. PROGRESSO -->
+  <section class="card hidden" id="progressCard">
+    <h2>Progresso</h2>
+    <div id="progLabel" class="muted" style="font-size:13px"></div>
+    <div class="bar"><div id="progBar" style="width:0%"></div></div>
+    <div id="progAlert"></div>
+    <div class="stats" id="progStats"></div>
+    <div class="row" id="liveRateRow" style="align-items:flex-end">
+      <div style="flex:0 0 auto;min-width:210px">
+        <label>Velocidade agora (msg/s)</label>
+        <div class="row">
+          <input type="number" id="liveRate" min="0.1" max="30" step="1" style="min-width:90px">
+          <button class="btn-ghost" id="liveRateBtn" style="flex:0 0 auto">Aplicar</button>
+        </div>
+      </div>
+      <div class="hint" id="liveRateHint" style="flex:1"></div>
+    </div>
+    <div class="row">
+      <button class="btn-danger" id="cancelBtn" style="flex:0 0 auto">Cancelar</button>
+      <button class="btn" id="resumeBtn" style="flex:0 0 auto">Retomar pendentes</button>
+      <button class="btn-ghost" id="retryBtn" style="flex:0 0 auto">Reenviar falhas</button>
+      <button class="btn-ghost" id="csvBtn" style="flex:0 0 auto">Baixar CSV</button>
+    </div>
+    <div id="progErrors"></div>
+  </section>
+</div>
+
+<!-- COLUNA LATERAL -->
+<aside>
+  <section class="card">
+    <h2>Pré-visualização</h2>
+    <div class="phone">
+      <div class="bubble" id="preview"><span class="muted">Escolha um template para ver a mensagem.</span></div>
+    </div>
+    <div id="sampleNav" class="hint"></div>
+  </section>
+
+  <section class="card">
+    <h2>Campanhas recentes</h2>
+    <div id="history" class="muted" style="font-size:13px">Nenhuma campanha ainda.</div>
+  </section>
+</aside>
+</main>
+
+<script>
+const state = {
+  templates: [], template: null, upload: null, mapping: {}, validation: null, campaign: null, historico: [],
+  headerMedia: null, campaignId: null, poll: null, samples: [], sampleIndex: 0
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function api(path, options = {}) {
+  const response = await fetch(path, options);
+  let data = null;
+  try { data = await response.json(); } catch (e) { data = null; }
+  if (!response.ok || (data && data.error)) {
+    const err = (data && (data.error || data.detail)) || `Erro HTTP ${response.status}`;
+    throw new Error(typeof err === 'string' ? err : `${err.message}${err.hint ? ' — ' + err.hint : ''}`);
+  }
+  return data;
+}
+
+// ------------------------------------------------------------------ conexão
+async function loadConnection() {
+  try {
+    const health = await api('/api/health');
+    if (!health.configured) {
+      $('dot').className = 'dot off';
+      $('connText').textContent = 'falta configurar: ' + health.missing.join(', ');
+      return;
+    }
+    const conn = await api('/api/connection');
+    $('dot').className = 'dot on';
+    $('connText').textContent = `${conn.display_phone_number} · ${conn.verified_name} · qualidade ${conn.quality_rating || '—'}`;
+  } catch (e) {
+    $('dot').className = 'dot off';
+    $('connText').textContent = 'sem conexão com a Meta';
+  }
+}
+
+// ----------------------------------------------------------------- templates
+async function loadTemplates() {
+  $('tplSelect').innerHTML = '<option value="">Carregando…</option>';
+  try {
+    const data = await api('/api/templates');
+    state.templates = data.templates;
+    renderTemplateOptions();
+    $('tplError').innerHTML = '';
+  } catch (e) {
+    $('tplSelect').innerHTML = '<option value="">— não foi possível carregar —</option>';
+    $('tplError').innerHTML = `<div class="alert a-err">${esc(e.message)}</div>` +
+      (e.message.includes('WABA') ? `
+        <div class="row" style="margin-bottom:10px">
+          <input type="text" id="wabaInput" placeholder="ID da conta WhatsApp Business (só números)">
+          <button class="btn-ghost" id="wabaSave" style="flex:0 0 auto">Salvar</button>
+        </div>
+        <div class="hint">business.facebook.com → WhatsApp Manager → Configurações da conta → ID da conta.
+        O valor fica salvo no .env e você não precisa informar de novo.</div>` : '');
+    const saveBtn = $('wabaSave');
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true; saveBtn.textContent = 'Salvando…';
+      try {
+        await api('/api/config/waba', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ waba_id: $('wabaInput').value })
+        });
+        loadTemplates();
+      } catch (err) {
+        $('tplError').innerHTML = `<div class="alert a-err">${esc(err.message)}</div>`;
+      } finally {
+        saveBtn.disabled = false; saveBtn.textContent = 'Salvar';
+      }
+    });
+  }
+}
+
+const RECENTES = 10;  // sem busca, o select mostra só os mais recentes
+
+// Status que a Meta ainda está avaliando: aparecem no select, mas não podem ser enviados.
+const EM_ANALISE = ['PENDING', 'IN_APPEAL', 'PENDING_DELETION'];
+
+function renderTemplateOptions() {
+  const termo = $('tplSearch').value.trim().toLowerCase();
+  const combina = t => !termo || t.name.toLowerCase().includes(termo);
+  // A ordem vinda da API é cronológica (mais recentes primeiro) — preservamos ela aqui.
+  let aprovados = state.templates.filter(t => t.status === 'APPROVED' && combina(t));
+  let analise = state.templates.filter(t => EM_ANALISE.includes(t.status) && combina(t));
+  let outros = termo
+    ? state.templates.filter(t => t.status !== 'APPROVED' && !EM_ANALISE.includes(t.status) && combina(t))
+    : [];
+
+  const totalAprovados = aprovados.length;
+  const totalAnalise = analise.length;
+  if (!termo) {
+    aprovados = aprovados.slice(0, RECENTES);
+    analise = analise.slice(0, RECENTES);
+  }
+
+  const opcao = (t, off) => `<option value="${state.templates.indexOf(t)}"${off ? ' disabled' : ''}>` +
+    `${esc(t.name)} · ${esc(off ? t.status : t.language)}</option>`;
+
+  let html = '<option value="">Selecione um template…</option>';
+  if (aprovados.length) html += `<optgroup label="${termo ? 'Aprovados' : RECENTES + ' mais recentes'}">` +
+    aprovados.map(t => opcao(t, false)).join('') + '</optgroup>';
+  if (analise.length) html += `<optgroup label="Em análise (${termo ? 'aguardando aprovação' : RECENTES + ' mais recentes'})">` +
+    analise.map(t => opcao(t, false)).join('') + '</optgroup>';
+  if (outros.length) html += '<optgroup label="Não aprovados (não é possível enviar)">' +
+    outros.map(t => opcao(t, true)).join('') + '</optgroup>';
+  if (!aprovados.length && !analise.length && !outros.length)
+    html = '<option value="">Nenhum template com esse nome</option>';
+
+  // Mantém o template já escolhido selecionado, mesmo que o filtro mude a lista.
+  $('tplSelect').innerHTML = html;
+  if (state.template) {
+    const indice = String(state.templates.indexOf(state.template));
+    if ($('tplSelect').querySelector(`option[value="${indice}"]`)) $('tplSelect').value = indice;
+  }
+
+  const total = state.templates.length;
+  $('tplCount').textContent = termo
+    ? `${aprovados.length + analise.length + outros.length} de ${total} templates correspondem a "${termo}"`
+    : `Mostrando os ${aprovados.length} mais recentes de ${totalAprovados} aprovados` +
+      (totalAnalise ? ` e ${analise.length} de ${totalAnalise} em análise` : '') +
+      ` — digite acima para buscar entre os ${total} templates da conta.`;
+}
+
+function selectTemplate() {
+  const index = $('tplSelect').value;
+  state.template = index === '' ? null : state.templates[Number(index)];
+  state.headerMedia = null;
+  $('mediaStatus').textContent = '';
+  $('mediaUrl').value = '';
+
+  if (!state.template) {
+    $('tplInfo').classList.add('hidden');
+    renderPreview(null);
+    return;
+  }
+  const tpl = state.template;
+  $('tplInfo').classList.remove('hidden');
+  const nVars = tpl.variables.length;
+  const emAnalise = EM_ANALISE.includes(tpl.status);
+  $('tplMeta').innerHTML =
+    `<span class="badge ${tpl.status === 'APPROVED' ? 'b-ok' : emAnalise ? 'b-warn' : 'b-err'}">${esc(tpl.status)}</span> ` +
+    `<span class="badge b-mute">${esc(tpl.category || '—')}</span> ` +
+    `<span class="badge b-mute">header: ${esc(tpl.header.format.toLowerCase())}</span> ` +
+    `<span class="badge ${nVars ? 'b-warn' : 'b-mute'}">${nVars} variáve${nVars === 1 ? 'l' : 'is'}</span>` +
+    (tpl.named_params ? ' <span class="badge b-mute">variáveis nomeadas</span>' : '') +
+    (emAnalise ? '<div class="hint">Este template ainda está em análise pela Meta. Você pode montar e revisar a campanha, mas o envio só funciona depois da aprovação.</div>' : '');
+
+  const needsMedia = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(tpl.header.format);
+  $('mediaBox').classList.toggle('hidden', !needsMedia);
+  if (needsMedia) $('mediaLabel').textContent = `Arquivo do header (${tpl.header.format.toLowerCase()})`;
+
+  renderVarMapping();
+  renderPreview(null);
+}
+
+// -------------------------------------------------------------- mapeamento
+function renderVarMapping() {
+  const box = $('varMapping');
+  if (!state.template || !state.upload) { box.innerHTML = ''; return; }
+  const vars = state.template.variables;
+  if (!vars.length) {
+    box.innerHTML = '<div class="hint">Este template não tem variáveis — nada a mapear.</div>';
+    state.mapping = {};
+    return;
+  }
+  const columns = state.upload.columns;
+  box.innerHTML = '<label>Variáveis do template</label>' + vars.map(v => {
+    const current = state.mapping[v.key] || {};
+    const guess = current.value || columns.find(c => c.toLowerCase() === String(v.name).toLowerCase()) || '';
+    return `<div class="varmap">
+      <div><span class="k">{{${esc(v.name)}}}</span> <span class="muted">· ${esc(v.section)}</span></div>
+      <div class="row" style="margin-top:6px">
+        <select data-var="${esc(v.key)}" data-role="type">
+          <option value="column"${current.type !== 'fixed' ? ' selected' : ''}>Coluna do arquivo</option>
+          <option value="fixed"${current.type === 'fixed' ? ' selected' : ''}>Valor fixo</option>
+        </select>
+        <select data-var="${esc(v.key)}" data-role="column" class="${current.type === 'fixed' ? 'hidden' : ''}">
+          <option value="">— escolha —</option>
+          ${columns.map(c => `<option value="${esc(c)}"${c === guess ? ' selected' : ''}>${esc(c)}</option>`).join('')}
+        </select>
+        <input type="text" data-var="${esc(v.key)}" data-role="fixed" placeholder="texto fixo"
+               value="${current.type === 'fixed' ? esc(current.value) : ''}" class="${current.type === 'fixed' ? '' : 'hidden'}">
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('[data-var]').forEach(el => el.addEventListener('change', syncMapping));
+  box.querySelectorAll('input[data-role=fixed]').forEach(el => el.addEventListener('input', syncMapping));
+  syncMapping();
+}
+
+function syncMapping() {
+  const box = $('varMapping');
+  const mapping = {};
+  box.querySelectorAll('select[data-role=type]').forEach(sel => {
+    const key = sel.dataset.var;
+    const type = sel.value;
+    const colSel = box.querySelector(`select[data-role=column][data-var="${CSS.escape(key)}"]`);
+    const fixedInput = box.querySelector(`input[data-role=fixed][data-var="${CSS.escape(key)}"]`);
+    colSel.classList.toggle('hidden', type === 'fixed');
+    fixedInput.classList.toggle('hidden', type !== 'fixed');
+    mapping[key] = { type, value: type === 'fixed' ? fixedInput.value : colSel.value };
+  });
+  state.mapping = mapping;
+}
+
+// ----------------------------------------------------------------- contatos
+document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  $('tabFile').classList.toggle('hidden', tab.dataset.tab !== 'file');
+  $('tabPaste').classList.toggle('hidden', tab.dataset.tab !== 'paste');
+}));
+
+function onListLoaded(data) {
+  state.upload = data;
+  state.validation = null;
+  $('validationCard').classList.add('hidden');
+  $('sendCard').classList.add('hidden');
+  $('loadInfo').classList.remove('hidden');
+  $('loadSummary').textContent = `${data.row_count} linhas carregadas de "${data.source}" · ${data.columns.length} coluna(s)`;
+  $('phoneCol').innerHTML = data.columns
+    .map(c => `<option value="${esc(c)}"${c === data.phone_column_guess ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  renderVarMapping();
+}
+
+$('contactsFile').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  $('contactsFileText').innerHTML = 'Lendo <b>' + esc(file.name) + '</b>…';
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const data = await api('/api/contacts/upload', { method: 'POST', body: form });
+    $('contactsFileText').innerHTML = '<b>' + esc(file.name) + '</b> — clique para trocar';
+    onListLoaded(data);
+  } catch (e) {
+    $('contactsFileText').textContent = 'Erro: ' + e.message;
+  }
+});
+
+$('pasteBtn').addEventListener('click', async () => {
+  try {
+    const data = await api('/api/contacts/paste', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: $('pasteArea').value })
+    });
+    onListLoaded(data);
+  } catch (e) { alert(e.message); }
+});
+
+$('phoneCol').addEventListener('change', () => { state.validation = null; });
+
+// ---------------------------------------------------------------- validação
+$('validateBtn').addEventListener('click', async () => {
+  if (!state.upload) return;
+  syncMapping();
+  const button = $('validateBtn');
+  button.disabled = true; button.textContent = 'Validando…';
+  try {
+    const data = await api('/api/contacts/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        upload_id: state.upload.upload_id,
+        phone_column: $('phoneCol').value,
+        mapping: state.mapping,
+        add_ninth_digit: $('add9').checked,
+        template: state.template
+      })
+    });
+    state.validation = data;
+    state.samples = data.samples || [];
+    state.sampleIndex = 0;
+    renderValidation(data);
+    renderPreview(state.samples[0] || null);
+    $('sendCard').classList.remove('hidden');
+    $('sendHint').innerHTML = `Serão enviadas <b>${data.summary.validos}</b> mensagens usando o template <b>${esc(state.template ? state.template.name : '—')}</b>.`;
+    atualizarRitmo();
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    button.disabled = false; button.textContent = 'Validar lista';
+  }
+});
+
+function issueTable(title, rows, badgeClass) {
+  if (!rows || !rows.length) return '';
+  return `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">
+      <span class="badge ${badgeClass}">${rows.length}</span> ${esc(title)}</summary>
+    <div class="scroll" style="margin-top:8px"><table>
+      <tr><th>Linha</th><th>Original</th><th>Motivo</th></tr>
+      ${rows.map(r => `<tr><td>${r.row}</td><td class="mono">${esc(r.original)}</td><td>${esc(r.reason)}</td></tr>`).join('')}
+    </table></div></details>`;
+}
+
+function renderValidation(data) {
+  const s = data.summary;
+  $('validationCard').classList.remove('hidden');
+  $('valStats').innerHTML = `
+    <div class="stat"><b style="color:var(--ok)">${s.validos}</b><span>vão receber</span></div>
+    <div class="stat"><b style="color:var(--warn)">${s.com_aviso}</b><span>com aviso</span></div>
+    <div class="stat"><b style="color:var(--danger)">${s.invalidos}</b><span>inválidos</span></div>
+    <div class="stat"><b>${s.duplicados + s.bloqueados}</b><span>dup./bloqueados</span></div>`;
+  $('valIssues').innerHTML =
+    issueTable('Números com aviso (serão enviados mesmo assim)', data.warnings, 'b-warn') +
+    issueTable('Números inválidos (descartados)', data.invalid, 'b-err') +
+    issueTable('Duplicados removidos', data.duplicates, 'b-mute') +
+    issueTable('Na blocklist (opt-out)', data.blocked, 'b-mute');
+}
+
+// --------------------------------------------------------------- preview
+function renderPreview(sample) {
+  const tpl = state.template;
+  const box = $('preview');
+  if (!tpl) { box.innerHTML = '<span class="muted">Escolha um template para ver a mensagem.</span>'; $('sampleNav').textContent = ''; return; }
+
+  const rendered = sample ? sample.rendered : { header: tpl.header.text, body: tpl.body.text, footer: tpl.footer };
+  let html = '';
+  if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(tpl.header.format)) {
+    const label = { IMAGE: 'imagem', VIDEO: 'vídeo', DOCUMENT: 'documento' }[tpl.header.format];
+    html += `<div class="media">${state.headerMedia ? '✓ ' + label + ' carregado' : label + ' do header'}</div>`;
+  }
+  if (tpl.header.format === 'TEXT' && rendered.header) html += `<div class="hd">${esc(rendered.header)}</div>`;
+  html += esc(rendered.body).replace(/\*(.+?)\*/g, '<b>$1</b>');
+  if (rendered.footer) html += `<div class="ft">${esc(rendered.footer)}</div>`;
+  if (tpl.buttons && tpl.buttons.length) html += tpl.buttons.map(b => `<div class="btnrow">${esc(b.text)}</div>`).join('');
+  box.innerHTML = html;
+
+  if (state.samples.length) {
+    $('sampleNav').innerHTML = `Exemplo ${state.sampleIndex + 1} de ${state.samples.length} — ${esc(state.samples[state.sampleIndex].phone)}
+      ${state.samples.length > 1 ? '<a href="#" id="nextSample" style="color:var(--brand)">próximo →</a>' : ''}`;
+    const next = $('nextSample');
+    if (next) next.addEventListener('click', event => {
+      event.preventDefault();
+      state.sampleIndex = (state.sampleIndex + 1) % state.samples.length;
+      renderPreview(state.samples[state.sampleIndex]);
+    });
+  } else {
+    $('sampleNav').textContent = 'Valide a lista para ver a mensagem com os dados reais.';
+  }
+}
+
+// ------------------------------------------------------------------- mídia
+$('mediaFile').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  if (!file || !state.template) return;
+  const type = state.template.header.format.toLowerCase();
+  $('mediaFileText').innerHTML = '<b>' + esc(file.name) + '</b> — clique para trocar';
+  const form = new FormData();
+  form.append('file', file);
+  form.append('media_type', type);
+  $('mediaStatus').innerHTML = 'Subindo arquivo para o Meta… <span class="spin" style="border-color:#ccc;border-top-color:#4a1f77"></span>';
+  try {
+    const data = await api('/api/media/upload', { method: 'POST', body: form });
+    state.headerMedia = { type, [type]: { id: data.media_id } };
+    $('mediaStatus').innerHTML = `<span class="badge b-ok">ok</span> media id <span class="mono">${esc(data.media_id)}</span>`;
+    renderPreview(state.samples[state.sampleIndex] || null);
+  } catch (e) {
+    $('mediaStatus').innerHTML = `<span class="badge b-err">erro</span> ${esc(e.message)}`;
+  }
+});
+
+$('mediaUrl').addEventListener('change', () => {
+  const url = $('mediaUrl').value.trim();
+  if (!url || !state.template) return;
+  const type = state.template.header.format.toLowerCase();
+  state.headerMedia = { type, [type]: { link: url } };
+  $('mediaStatus').innerHTML = '<span class="badge b-ok">ok</span> usando URL pública';
+  renderPreview(state.samples[state.sampleIndex] || null);
+});
+
+// ----------------------------------------------------------------- ritmo
+function duracaoLonga(segundos) {
+  const s = Math.round(segundos);
+  if (s < 60) return `${s}s`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return (h ? `${h}h ` : '') + `${m} min` + (r ? ` ${r}s` : '');
+}
+
+function duracao(segundos) {
+  if (segundos < 90) return `${Math.round(segundos)}s`;
+  const min = segundos / 60;
+  return min < 90 ? `${Math.round(min)} min` : `${(min / 60).toFixed(1)}h`;
+}
+
+// A Meta entrega 80 msg/s por número (nível STANDARD); o teto daqui é bem menor de propósito.
+function atualizarRitmo() {
+  const taxa = Number($('rate').value) || 1;
+  const total = state.validation ? state.validation.summary.validos : 0;
+  const aviso = taxa > 20 ? ' — acima de 20/s a Meta costuma responder com rate limit (o envio freia sozinho)' : '';
+  $('rateHint').innerHTML = total
+    ? `${total} mensagens em ≈ <b>${duracao(total / taxa)}</b>${aviso}`
+    : `Padrão 8/s. Limite da Meta: 80/s por número${aviso}`;
+}
+
+// ----------------------------------------------------------------- disparo
+function campaignPayload(extra = {}) {
+  return Object.assign({
+    upload_id: state.upload.upload_id,
+    phone_column: $('phoneCol').value,
+    template: state.template,
+    mapping: state.mapping,
+    add_ninth_digit: $('add9').checked,
+    header_media: state.headerMedia,
+    dry_run: $('dryRun').checked,
+    rate: Number($('rate').value)
+  }, extra);
+}
+
+async function startCampaign(payload, confirmText) {
+  if (confirmText && !confirm(confirmText)) return;
+  try {
+    const data = await api('/api/campaigns', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    abrirCampanha(data.campaign_id, { scroll: true });
+  } catch (e) { alert(e.message); }
+}
+
+// Abre o painel de acompanhamento de qualquer campanha (nova, em andamento ou já encerrada).
+function abrirCampanha(id, opcoes = {}) {
+  state.campaignId = id;
+  history.replaceState(null, '', '#c=' + id);  // permite recarregar/compartilhar o link da campanha
+  $('progressCard').classList.remove('hidden');
+  if (opcoes.scroll) $('progressCard').scrollIntoView({ behavior: 'smooth' });
+  marcarHistoricoSelecionado();
+  startPolling();
+}
+
+$('sendBtn').addEventListener('click', () => {
+  if (!state.template || !state.validation) return;
+  const total = state.validation.summary.validos;
+  const modo = $('dryRun').checked ? ' (SIMULAÇÃO — nada será enviado)' : '';
+  const taxa = Number($('rate').value) || 1;
+  const tempo = `\n\nVelocidade: ${taxa} msg/s — leva cerca de ${duracao(total / taxa)}.`;
+  const aviso = state.template.status !== 'APPROVED' && !$('dryRun').checked
+    ? `\n\nATENÇÃO: o template está com status ${state.template.status} — a Meta deve recusar os envios.`
+    : '';
+  startCampaign(campaignPayload(), `Disparar ${total} mensagens com o template "${state.template.name}"?${modo}${tempo}${aviso}`);
+});
+
+$('testBtn').addEventListener('click', () => {
+  const phone = $('testPhone').value.trim();
+  if (!phone) { alert('Digite um número para o teste.'); return; }
+  const modo = $('dryRun').checked ? ' (SIMULAÇÃO — nada será enviado)' : '';
+  startCampaign(campaignPayload({ test_phone: phone }),
+    `Enviar 1 mensagem de teste para ${phone}?${modo}`);
+});
+
+// --------------------------------------------------------------- progresso
+const ROTULOS = {
+  pending: 'aguardando', running: 'enviando', finished: 'concluída',
+  cancelled: 'cancelada', interrupted: 'interrompida', paused: 'pausada'
+};
+const FINAIS = ['finished', 'cancelled', 'interrupted', 'paused'];
+
+function startPolling() {
+  clearInterval(state.poll);
+  state.poll = setInterval(pollCampaign, 1000);
+  pollCampaign();
+}
+
+async function pollCampaign() {
+  if (!state.campaignId) return;
+  try {
+    const data = await api('/api/campaigns/' + state.campaignId);
+    const pct = data.total ? Math.round(data.processed / data.total * 100) : 0;
+    state.campaign = data;
+    const quando = (data.finished_at || data.interrupted_at || data.started_at || data.created_at || '').replace('T', ' ');
+    $('progLabel').innerHTML = `${esc(data.label)} — <b>${ROTULOS[data.status] || data.status}</b>` +
+      (data.status === 'running' ? ' <span class="badge b-warn pulse">ao vivo</span>' : '') +
+      (data.dry_run ? ' <span class="badge b-warn">simulação</span>' : '') +
+      `<div class="muted" style="font-size:12px">${esc(quando)} · ${ritmoTexto(data)} · id ${esc(data.id)}</div>`;
+    $('progBar').style.width = pct + '%';
+    $('progStats').innerHTML = `
+      <div class="stat"><b>${data.processed}/${data.total}</b><span>processados</span></div>
+      <div class="stat"><b style="color:var(--ok)">${data.sent}</b><span>enviados</span></div>
+      <div class="stat"><b style="color:var(--danger)">${data.failed}</b><span>falhas</span></div>
+      <div class="stat"><b>${data.pending}</b><span>pendentes</span></div>
+      <div class="stat"><b>${pct}%</b><span>progresso</span></div>`;
+
+    $('progAlert').innerHTML = alertaDaCampanha(data);
+    $('cancelBtn').disabled = data.status !== 'running';
+    $('retryBtn').disabled = data.failed === 0 || data.status === 'running';
+    const rodando = data.status === 'running';
+    $('liveRateRow').classList.toggle('hidden', !rodando);
+    if (rodando) {
+      if (document.activeElement !== $('liveRate')) $('liveRate').value = data.rate;
+      const falta = data.pending;
+      const taxa = data.rate_real || data.rate || 1;
+      $('liveRateHint').innerHTML = `Faltam ${falta} — cerca de <b>${duracao(falta / taxa)}</b> no ritmo atual.` +
+        ` A mudança vale para os próximos envios, sem interromper o disparo.`;
+    }
+    $('resumeBtn').disabled = !data.can_resume || !!data.resumed_by;
+    $('resumeBtn').textContent = data.pending
+      ? `Retomar ${data.pending} pendentes` : 'Retomar pendentes';
+
+    if (data.errors && data.errors.length) {
+      $('progErrors').innerHTML = `<details open style="margin-top:12px"><summary style="cursor:pointer;font-size:13px">
+        <span class="badge b-err">${data.error_count}</span> falhas</summary>
+        <div class="scroll" style="margin-top:8px"><table><tr><th>Telefone</th><th>Erro</th></tr>
+        ${data.errors.map(e => `<tr><td class="mono">${esc(e.phone)}</td><td>${esc(e.error)}</td></tr>`).join('')}
+        </table></div></details>`;
+    } else {
+      $('progErrors').innerHTML = '';
+    }
+
+    if (FINAIS.includes(data.status)) {
+      clearInterval(state.poll);
+      loadHistory();
+    }
+  } catch (e) { clearInterval(state.poll); }
+}
+
+// Velocidade configurada x real, mais o quanto da cota horária a Meta já contabilizou.
+function ritmoTexto(data) {
+  if (!data.rate) return `intervalo ${data.interval}s`;
+  const partes = [`${data.rate} msg/s`];
+  if (data.rate_real) partes.push(`real ${data.rate_real}/s`);
+  if (data.workers) partes.push(`${data.workers} envios simultâneos`);
+  if (data.freios) partes.push(`${data.freios} freios por rate limit`);
+  const uso = data.uso_meta && data.uso_meta.whatsapp_business_messaging;
+  if (uso && uso.call_count != null) partes.push(`cota Meta ${uso.call_count}%`);
+  if (data.duracao_s != null) {
+    partes.push(FINAIS.includes(data.status)
+      ? `durou <b>${duracaoLonga(data.duracao_s)}</b>`
+      : `há ${duracaoLonga(data.duracao_s)}`);
+  }
+  return partes.join(' · ');
+}
+
+// Explica o que aconteceu quando a campanha não terminou sozinha.
+function alertaDaCampanha(data) {
+  if (data.status === 'finished' && data.duracao_s != null) {
+    const media = data.duracao_s ? (data.processed / data.duracao_s) : 0;
+    const porMin = Math.round(media * 60);
+    return `<div class="alert a-info"><b>Concluída em ${duracaoLonga(data.duracao_s)}.</b>
+      ${data.sent} enviadas${data.failed ? `, ${data.failed} com falha` : ' sem falhas'} —
+      média de ${media.toFixed(1)} msg/s (${porMin}/min)${data.freios ? `, com ${data.freios} freios por rate limit` : ''}.</div>`;
+  }
+  if (data.resumed_by) {
+    return `<div class="alert a-info">Os ${data.pending} pendentes desta campanha foram retomados em outra execução.
+      <a href="#" onclick="abrirCampanha('${data.resumed_by}');return false">abrir a retomada →</a></div>`;
+  }
+  if (data.pending && FINAIS.includes(data.status) && data.status !== 'finished') {
+    const causa = MOTIVOS[data.stop_reason] ||
+      (data.status === 'cancelled' ? MOTIVOS.usuario : MOTIVOS.processo);
+    const extra = data.stop_reason === 'tempo'
+      ? ` O limite por execução é de ${Math.round(data.time_budget_s || 0)}s — a campanha não falhou, só não coube tudo de uma vez.`
+      : '';
+    return `<div class="alert a-warn"><b>Envio pausado:</b> ${causa}.${extra}
+      ${data.sent} já receberam e <b>${data.pending}</b> continuam sem mensagem —
+      use <b>Retomar pendentes</b> para continuar de onde parou, sem reenviar para quem já recebeu.</div>`;
+  }
+  return '';
+}
+
+$('cancelBtn').addEventListener('click', async () => {
+  if (!state.campaignId || !confirm('Cancelar o envio? As mensagens já enviadas não voltam atrás.')) return;
+  try { await api('/api/campaigns/' + state.campaignId + '/cancel', { method: 'POST' }); } catch (e) { alert(e.message); }
+});
+
+$('retryBtn').addEventListener('click', async () => {
+  if (!state.campaignId) return;
+  try {
+    const data = await api('/api/campaigns/' + state.campaignId + '/retry', { method: 'POST' });
+    state.campaignId = data.campaign_id;
+    startPolling();
+  } catch (e) { alert(e.message); }
+});
+
+$('liveRateBtn').addEventListener('click', async () => {
+  const taxa = Number($('liveRate').value);
+  if (!state.campaignId || !taxa) return;
+  try {
+    await api(`/api/campaigns/${state.campaignId}/rate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rate: taxa })
+    });
+    pollCampaign();
+  } catch (e) { alert(e.message); }
+});
+
+$('resumeBtn').addEventListener('click', async () => {
+  const c = state.campaign;
+  if (!c || !c.can_resume) return;
+  const modo = c.dry_run ? ' (SIMULAÇÃO — nada será enviado)' : '';
+  const taxa = Number($('rate').value) || 8;
+  if (!confirm(`Retomar o disparo de "${c.template.name}" para os ${c.pending} contatos pendentes?${modo}\n\n` +
+               `Quem já recebeu (${c.sent}) não será incluído.\n` +
+               `Velocidade: ${taxa} msg/s — cerca de ${duracao(c.pending / taxa)}.`)) return;
+  try {
+    const data = await api(`/api/campaigns/${c.id}/resume`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rate: taxa })
+    });
+    abrirCampanha(data.campaign_id, { scroll: true });
+    loadHistory();
+  } catch (e) { alert(e.message); }
+});
+
+$('csvBtn').addEventListener('click', () => {
+  if (state.campaignId) window.location = `/api/campaigns/${state.campaignId}/results.csv`;
+});
+
+// --------------------------------------------------------------- histórico
+const CLASSE_STATUS = {
+  running: 'b-warn pulse', finished: 'b-ok', cancelled: 'b-mute',
+  interrupted: 'b-err', paused: 'b-warn', pending: 'b-mute'
+};
+
+// Cada parada tem uma causa: quem parou e por quê muda o que o usuário precisa fazer.
+const MOTIVOS = {
+  usuario: 'você interrompeu o envio',
+  tempo: 'a execução atingiu o tempo limite',
+  processo: 'o aplicativo foi encerrado no meio do envio'
+};
+
+async function loadHistory() {
+  try {
+    const data = await api('/api/campaigns');
+    state.historico = data.campaigns;
+    if (!data.campaigns.length) return;
+    $('history').innerHTML = data.campaigns.map(c => {
+      const pct = c.total ? Math.round((c.sent + c.failed) / c.total * 100) : 0;
+      const causas = { usuario: 'você parou', tempo: 'tempo limite', processo: 'app encerrado' };
+      const situacao = c.resumed_by ? 'retomada'
+        : (c.stop_reason && causas[c.stop_reason] ? `pausada · ${causas[c.stop_reason]}` : (ROTULOS[c.status] || c.status));
+      const classe = c.resumed_by ? 'b-mute' : (CLASSE_STATUS[c.status] || 'b-mute');
+      return `
+      <div class="hist${c.id === state.campaignId ? ' sel' : ''}" data-id="${c.id}"
+           onclick="abrirCampanha('${c.id}')" title="Ver o progresso desta campanha">
+        <div>
+          <div class="nome">${c.parent_id ? '↳ ' : ''}${esc(c.template.name || c.label)}</div>
+          <div class="muted" style="font-size:12px">
+            ${esc((c.created_at || '').replace('T', ' '))}${c.dry_run ? ' · simulação' : ''}
+            · ${c.sent + c.failed}/${c.total} (${pct}%)${c.pending ? ` · ${c.pending} pendentes` : ''}${c.duracao_s != null && c.status === 'finished' ? ` · ${duracaoLonga(c.duracao_s)}` : ''}
+          </div>
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <span class="badge b-ok">${c.sent}</span>
+          ${c.failed ? `<span class="badge b-err">${c.failed}</span>` : ''}
+          <div style="margin-top:3px"><span class="badge ${classe}">${esc(situacao)}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+    reconectarEmAndamento();
+  } catch (e) { /* histórico é opcional */ }
+}
+
+function marcarHistoricoSelecionado() {
+  document.querySelectorAll('.hist').forEach(el => el.classList.toggle('sel', el.dataset.id === state.campaignId));
+}
+
+// Ao abrir/recarregar a página, volta a acompanhar sozinho a campanha que estiver disparando.
+function reconectarEmAndamento() {
+  if (state.campaignId) return;
+  const daUrl = (location.hash.match(/^#c=([a-f0-9]+)$/) || [])[1];
+  if (daUrl && (state.historico || []).some(c => c.id === daUrl)) { abrirCampanha(daUrl); return; }
+  const ativa = (state.historico || []).find(c => c.status === 'running' || c.status === 'pending');
+  if (ativa) abrirCampanha(ativa.id);
+}
+
+$('tplSelect').addEventListener('change', selectTemplate);
+$('tplSearch').addEventListener('input', renderTemplateOptions);
+$('tplReload').addEventListener('click', loadTemplates);
+$('rate').addEventListener('input', atualizarRitmo);
+atualizarRitmo();
+
+loadConnection();
+loadTemplates();
+loadHistory();
+setInterval(loadHistory, 10000);  // mantém o histórico e a reconexão em dia sem recarregar a página
+</script>
+</body>
+</html>

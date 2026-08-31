@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+campaigns/
+uploads/
+*.pyc
+.env
+clientes.csv
+blocklist.txt
+whatsapp_campaign.py

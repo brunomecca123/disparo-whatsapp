@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Sobe o app de disparo. Funciona de qualquer diretório: resolve a raiz do
+# projeto pelo caminho do próprio script e usa o Python do venv local.
+set -euo pipefail
+
+RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY="$RAIZ/venv/bin/python"
+
+if [[ ! -x "$PY" ]]; then
+  echo "venv não encontrado em $RAIZ/venv — crie com: python3 -m venv venv && ./venv/bin/pip install -r requirements.txt" >&2
+  exit 1
+fi
+
+PORTA="${APP_PORT:-8777}"
+
+# Derruba instância anterior deste mesmo projeto. Compara o cwd do processo com
+# a raiz, porque o cmdline pode ter caminho relativo ou absoluto.
+ANTIGOS=""
+for pid in $(pgrep -f 'app\.py' || true); do
+  [[ "$pid" == "$$" ]] && continue
+  [[ "$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)" == "$RAIZ" ]] && ANTIGOS+=" $pid"
+done
+
+# Reiniciar mata o disparo: o envio roda dentro do processo. Só segue se nada estiver rodando.
+if [[ -n "${ANTIGOS// /}" && "${1:-}" != "--force" ]]; then
+  # O `|| true` importa: sem campanha rodando o grep sai com 1 e o `set -e` mataria o script.
+  ATIVAS=$( (curl -s -m 3 "http://127.0.0.1:$PORTA/api/campaigns" 2>/dev/null \
+    | grep -c '"status": *"running"') || true )
+  ATIVAS=${ATIVAS:-0}
+  if [[ "$ATIVAS" -gt 0 ]]; then
+    echo "ABORTADO: $ATIVAS campanha(s) disparando agora — reiniciar mataria o envio." >&2
+    echo "Espere terminar, cancele pela tela, ou rode: $0 --force" >&2
+    exit 1
+  fi
+fi
+
+if [[ -n "${ANTIGOS// /}" ]]; then
+  echo "Encerrando instância anterior (PID:$ANTIGOS)…"
+  kill $ANTIGOS 2>/dev/null || true
+  for _ in 1 2 3 4 5; do
+    sleep 0.4
+    kill -0 $ANTIGOS 2>/dev/null || break
+  done
+  kill -9 $ANTIGOS 2>/dev/null || true
+fi
+
+cd "$RAIZ"
+echo "Iniciando em http://127.0.0.1:$PORTA (Ctrl+C para parar)"
+exec "$PY" app.py "$@"
