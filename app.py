@@ -96,6 +96,8 @@ def health():
         "phone_id": settings.phone_id,
         "api_version": settings.api_version,
         "send_interval": settings.send_interval,
+        # Como este processo dispara: em produção é o que revela um deploy mal configurado.
+        "execucao": campaign_service.diagnostico(),
     }
 
 
@@ -418,8 +420,8 @@ def create_campaign(payload: CampaignPayload):
             else f"{template['name']} ({len(destinatarios)} contatos)"
         ),
     )
-    campaign_service.start_campaign(campanha["id"])
-    return {"campaign_id": campanha["id"], "total": campanha["total"]}
+    modo = campaign_service.start_campaign(campanha["id"])
+    return {"campaign_id": campanha["id"], "total": campanha["total"], "started_by": modo}
 
 
 class InternalRunPayload(BaseModel):
@@ -472,8 +474,8 @@ def retry_failed(campaign_id: str, payload: Optional[RatePayload] = None):
     nova = campaign_service.retry_failed(campaign_id, rate=payload.rate if payload else None)
     if not nova:
         raise HTTPException(400, "Não há falhas para reenviar.")
-    campaign_service.start_campaign(nova["id"])
-    return {"campaign_id": nova["id"], "total": nova["total"]}
+    modo = campaign_service.start_campaign(nova["id"])
+    return {"campaign_id": nova["id"], "total": nova["total"], "started_by": modo}
 
 
 @app.post("/api/campaigns/{campaign_id}/rate")
@@ -493,8 +495,8 @@ def resume_campaign(campaign_id: str, payload: Optional[RatePayload] = None):
     nova = campaign_service.resume_campaign(campaign_id, rate=payload.rate if payload else None)
     if not nova:
         raise HTTPException(status_code=400, detail="campanha sem pendentes ou ainda em execução")
-    campaign_service.start_campaign(nova["id"])
-    return {"campaign_id": nova["id"], "total": nova["total"]}
+    modo = campaign_service.start_campaign(nova["id"])
+    return {"campaign_id": nova["id"], "total": nova["total"], "started_by": modo}
 
 
 @app.get("/api/campaigns/{campaign_id}/results.csv")

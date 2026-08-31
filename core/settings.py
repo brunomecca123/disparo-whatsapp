@@ -10,7 +10,16 @@ ENV_PATH = BASE_DIR / ".env"
 
 # Na Vercel o código roda em função serverless: filesystem somente leitura (fora de /tmp)
 # e processo congelado assim que a resposta sai.
-SERVERLESS = bool(os.getenv("VERCEL"))
+#
+# A detecção não depende de uma variável só: VERCEL e VERCEL_ENV existem apenas quando o
+# projeto expõe as System Environment Variables (dá para desligar isso no painel), enquanto
+# AWS_LAMBDA_FUNCTION_NAME vem do runtime e está sempre lá. SERVERLESS=1 é a saída manual.
+SERVERLESS = bool(
+    os.getenv("VERCEL")
+    or os.getenv("VERCEL_ENV")
+    or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+    or os.getenv("SERVERLESS")
+)
 # Na Vercel o filesystem e somente leitura, menos /tmp; local fica na raiz do projeto.
 UPLOAD_DIR = Path("/tmp/uploads") if os.getenv("VERCEL") else BASE_DIR / "uploads"
 

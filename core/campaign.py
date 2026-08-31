@@ -382,11 +382,51 @@ def _agendar_execucao(campaign_id: str, time_budget_s: Optional[float] = None) -
         return False
 
 
-def start_campaign(campaign_id: str, time_budget_s: Optional[float] = None):
-    """Local: thread, para a interface não travar. Vercel: outra invocação assume o envio."""
-    if SERVERLESS and _agendar_execucao(campaign_id, time_budget_s):
-        return
+def _execucao_viva(campanha: Dict) -> bool:
+    """Alguém está mesmo enviando esta campanha agora?
+
+    Status 'running' sozinho não basta: se a plataforma cortou a invocação no meio, a
+    campanha fica marcada como rodando para sempre. Quem responde é o batimento.
+    """
+    if campanha.get("status") != "running":
+        return False
+    batida = campanha.get("heartbeat_at")
+    if not batida:
+        return False
+    try:
+        quando = datetime.fromisoformat(str(batida).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if quando.tzinfo is None:
+        quando = quando.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - quando).total_seconds() < HEARTBEAT_TOLERANCIA_S
+
+
+def diagnostico() -> Dict:
+    """Como este processo pretende disparar — o que /api/health mostra para depurar o deploy."""
+    return {
+        "serverless": SERVERLESS,
+        "self_invoke_url": _url_base(),
+        "time_budget_s": ORCAMENTO_PADRAO_S,
+    }
+
+
+def start_campaign(campaign_id: str, time_budget_s: Optional[float] = None) -> str:
+    """Local: thread, para a interface não travar. Vercel: outra invocação assume o envio.
+
+    Devolve como o envio começou — o valor aparece na resposta da API e é o primeiro lugar
+    a olhar quando uma campanha fica parada em "aguardando".
+    """
+    if SERVERLESS:
+        if _agendar_execucao(campaign_id, time_budget_s):
+            return "invocacao"
+        # Não deu para chamar a si mesma (sem URL, ou deployment protegido). Uma thread aqui
+        # morreria congelada com a função: enviar dentro da própria requisição é o único
+        # caminho que realmente entrega as mensagens.
+        executar(campaign_id, time_budget_s)
+        return "inline"
     threading.Thread(target=executar, args=(campaign_id, time_budget_s), daemon=True).start()
+    return "thread"
 
 
 # ------------------------------------------------------------------ controle
@@ -457,9 +497,11 @@ def get_status(campaign_id: str) -> Optional[Dict]:
         "interrupted_at": campanha.get("interrupted_at"),
         "parent_id": campanha.get("parent_id"),
         "resumed_by": campanha.get("resumed_by"),
+        # Dá para retomar sempre que sobrou fila e ninguém está enviando de fato — inclusive
+        # uma campanha que nunca saiu de "aguardando" porque o processo caiu antes do início.
         "can_resume": (campanha.get("pending", 0) > 0
-                       and campanha["status"] not in ("running", "pending")
-                       and not campanha.get("resumed_by")),
+                       and not campanha.get("resumed_by")
+                       and not _execucao_viva(campanha)),
         "errors": [{"phone": f["phone"], "error": f["error"]} for f in falhas],
         "error_count": len(falhas),
     }
@@ -518,8 +560,14 @@ def failed_recipients(campaign_id: str) -> List[Dict]:
 def resume_campaign(campaign_id: str, rate: Optional[float] = None) -> Optional[Dict]:
     """Cria uma campanha nova só com os pendentes. Não reenvia para quem já recebeu."""
     original = db.buscar_campanha(campaign_id)
-    if not original or original["status"] in ("running", "pending") or original.get("resumed_by"):
+    if not original or original.get("resumed_by") or _execucao_viva(original):
         return None
+    if original["status"] == "pending":
+        # Nunca chegou a enviar nada: não há motivo para criar uma cópia, é a mesma campanha
+        # que precisa começar. Acontece quando o processo morre entre criar e disparar.
+        if rate:
+            set_rate(campaign_id, rate)
+        return db.buscar_campanha(campaign_id)
     pendentes = pending_recipients(campaign_id)
     nova = _recriar(original, pendentes, f"· retomada ({len(pendentes)} pendentes)", rate)
     if nova:
