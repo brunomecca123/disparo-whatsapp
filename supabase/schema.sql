@@ -96,6 +96,10 @@ select
   end as duracao_s
 from campaigns c;
 
+-- Sem isto a view roda como SECURITY DEFINER (dona: postgres) e devolveria as
+-- campanhas para a anon key, furando o RLS das tabelas abaixo.
+alter view campaign_overview set (security_invoker = on);
+
 -- --------------------------------------------------------------- segurança
 -- O aplicativo acessa com a service_role key, que ignora RLS. Ligamos RLS sem
 -- criar policies: assim a anon key (pública) não lê nem escreve nada.
