@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from core import campaign as campaign_service
-from core import contacts, db, meta_api, storage
+from core import contacts, db, meta_api, storage, template_builder
 from core.settings import BASE_DIR, SERVERLESS, UPLOAD_DIR, settings
 
 app = FastAPI(title="DisparoMais", docs_url=None, redoc_url=None)
@@ -158,11 +158,94 @@ def connection():
 
 
 @app.get("/api/templates")
-def templates():
+def templates(ordem: str = ""):
     try:
-        return {"templates": meta_api.list_templates()}
+        return {"templates": meta_api.list_templates(aprovados_primeiro=ordem != "recentes")}
     except meta_api.MetaApiError as erro:
         return _erro_meta(erro)
+
+
+# ------------------------------------------------------- criação de templates
+
+
+class TemplateDraftPayload(BaseModel):
+    name: str = ""
+    category: str = ""
+    language: str = "pt_BR"
+    header: Dict = {}
+    body: Dict = {}
+    footer: str = ""
+    buttons: List[Dict] = []
+
+
+@app.post("/api/templates/validate")
+def validar_template(payload: TemplateDraftPayload):
+    """Confere o rascunho contra as regras da Meta e mostra o payload que seria enviado."""
+    dados = payload.model_dump()
+    erros, avisos = template_builder.validate(dados)
+    return {
+        "errors": erros,
+        "warnings": avisos,
+        "payload": template_builder.build_payload(dados),
+    }
+
+
+@app.post("/api/templates")
+def criar_template(payload: TemplateDraftPayload):
+    """Envia o template para análise da Meta. A aprovação chega depois, pela listagem."""
+    dados = payload.model_dump()
+    erros, _ = template_builder.validate(dados)
+    if erros:
+        raise HTTPException(400, " ".join(erros))
+    try:
+        criado = meta_api.create_template(template_builder.build_payload(dados))
+    except meta_api.MetaApiError as erro:
+        # As dicas genéricas de meta_api falam de envio de mensagem; aqui o contexto é outro.
+        erro.hint = template_builder.error_hint(erro.message) or ""
+        return _erro_meta(erro)
+    return {**criado, "name": dados["name"], "language": dados["language"]}
+
+
+# ------------------------------------------------------- remoção de templates
+
+
+@app.get("/api/templates/usage")
+def uso_templates():
+    """Quando cada template foi disparado por aqui — base para decidir o que apagar."""
+    try:
+        return {"usage": campaign_service.uso_templates()}
+    except db.DbError as erro:
+        raise HTTPException(400, f"Não consegui ler o histórico de campanhas: {erro}")
+
+
+class TemplateDeletePayload(BaseModel):
+    name: str
+    id: str = ""
+    language: str = ""
+
+
+@app.post("/api/templates/delete")
+def apagar_template(payload: TemplateDeletePayload):
+    """Apaga um template (só a versão do idioma informado, quando vem o id)."""
+    # A tela já trava estes, mas o servidor confere de novo: apagar no meio de um disparo
+    # faz todos os pendentes falharem.
+    try:
+        ativa = campaign_service.uso_templates().get(f"{payload.name}|{payload.language}", {}).get("ativa")
+    except db.DbError:
+        ativa = False
+    if ativa:
+        raise HTTPException(409, "Este template está numa campanha em andamento — espere terminar para apagar.")
+    try:
+        meta_api.delete_template(payload.name, payload.id)
+    except meta_api.MetaApiError as erro:
+        # As dicas de meta_api falam de envio de mensagem; aqui só uma faz sentido.
+        erro.hint = (
+            "A Meta responde assim quando o template já não existe. Se ele existe, o usuário do sistema "
+            "precisa de controle total da conta do WhatsApp (Configurações do negócio → Usuários do sistema)."
+            if erro.code == 100 and "permission" in erro.message.lower() else ""
+        )
+        return _erro_meta(erro)
+    return {"ok": True}
 
 
 # -------------------------------------------------------------------- contatos

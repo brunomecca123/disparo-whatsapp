@@ -554,6 +554,27 @@ def list_campaigns(limite: int = 30) -> List[Dict]:
     ]
 
 
+def uso_templates() -> Dict[str, Dict]:
+    """Resumo de uso por template ("nome|idioma"): último disparo real, quantos e se há um ativo.
+
+    Simulações não contam como uso, mas uma campanha ativa sempre trava o template — apagar
+    no meio do envio faria todos os pendentes falharem.
+    """
+    uso: Dict[str, Dict] = {}
+    for campanha in db.uso_de_templates():
+        chave = f"{campanha.get('nome')}|{campanha.get('idioma')}"
+        item = uso.setdefault(chave, {"ultimo": None, "campanhas": 0, "enviadas": 0, "ativa": False})
+        if campanha.get("status") in ("running", "pending"):
+            item["ativa"] = True
+        if campanha.get("dry_run"):
+            continue
+        item["campanhas"] += 1
+        item["enviadas"] += campanha.get("sent") or 0
+        if not item["ultimo"] or campanha["created_at"] > item["ultimo"]:
+            item["ultimo"] = campanha["created_at"]
+    return uso
+
+
 # ------------------------------------------------------- retomada e reenvio
 
 

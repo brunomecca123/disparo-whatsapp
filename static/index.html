@@ -106,6 +106,12 @@
   .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);
         border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
   @keyframes sp{to{transform:rotate(360deg)}}
+  /* O histórico cresce a cada disparo: rola por dentro em vez de esticar a coluna. */
+  #history{max-height:560px;overflow-y:auto;overscroll-behavior:contain;margin-right:-8px;padding-right:8px;
+           scrollbar-width:thin;scrollbar-color:#cdbfe6 transparent}
+  #history::-webkit-scrollbar{width:8px}
+  #history::-webkit-scrollbar-thumb{background:#cdbfe6;border-radius:999px}
+  #history::-webkit-scrollbar-track{background:transparent}
   .hist{display:flex;justify-content:space-between;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line);
         font-size:13px;cursor:pointer;border-radius:6px}
   .hist:last-child{border-bottom:0}
@@ -114,6 +120,166 @@
   .hist .nome{font-weight:600;word-break:break-all}
   .pulse{animation:pu 1.2s ease-in-out infinite}
   @keyframes pu{50%{opacity:.35}}
+
+  /* Navegação entre as telas do sistema. */
+  .views{display:flex;gap:4px;background:rgba(255,255,255,.12);padding:4px;border-radius:999px;margin-left:16px}
+  .views button{background:transparent;color:rgba(255,255,255,.85);padding:7px 16px;border-radius:999px;font-size:13px;position:relative}
+  .views button:hover{color:#fff;background:rgba(255,255,255,.1)}
+  .views button.active{background:#fff;color:var(--brand)}
+  .views button.novidade::after{content:"";position:absolute;top:5px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--marca-rosa)}
+
+  /* ------------------------------------------------------ criar template */
+  .toolbar{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .toolbar>button,.toolbar .pop>button{background:#eef1f3;color:var(--ink);padding:6px 11px;font-size:13px;min-width:34px}
+  .toolbar>button:hover,.toolbar .pop>button:hover{background:#e2e6e9}
+  .toolbar .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+  .toolbar .btn-var{background:var(--brand)!important;color:#fff!important}
+  .pop{position:relative}
+  .popover{position:absolute;top:calc(100% + 6px);left:0;z-index:20;background:#fff;border:1px solid var(--line);border-radius:10px;
+           box-shadow:0 8px 24px rgba(17,27,33,.14);padding:10px;width:280px}
+  .popover.emojis{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;width:300px}
+  .popover.emojis button{background:transparent;padding:5px;font-size:18px;font-weight:400}
+  .popover.emojis button:hover{background:#f3eefb}
+  .popover .vopt{display:flex;justify-content:space-between;width:100%;background:transparent;color:var(--ink);font-weight:400;padding:6px 8px;font-size:13px;text-align:left}
+  .popover .vopt:hover{background:#f3eefb}
+  .popover .vopt code{color:var(--brand);font-weight:700}
+  .chatbg{background:#efeae2;border-radius:12px;padding:16px;
+          background-image:radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px);background-size:14px 14px}
+  .ebubble{background:#fff;border-radius:0 10px 10px 10px;padding:12px 14px 14px;box-shadow:0 1px 1px rgba(0,0,0,.13);max-width:560px}
+  .ebubble .rot{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px}
+  .ebubble .rot:first-child{margin-top:0}
+  .ebubble .rot i{font-style:normal;font-weight:400;text-transform:none;letter-spacing:0}
+  .ebubble input[type=text]{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0;width:100%;background:#fff}
+  .ebubble ::placeholder{color:#a9b3ba;font-weight:400;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .ebubble input[type=text]:hover,.hl:hover{border-color:#cdbfe6}
+  .ebubble input[type=text]:focus,.hl:focus-within{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(74,31,119,.12)}
+  /* O fundo fica no contêiner: um textarea opaco esconderia o destaque das variáveis atrás dele. */
+  .ebubble textarea:focus{outline:none;background:transparent}
+  .ebubble .e-hd{font-weight:700;font-size:15px}
+  .ebubble .e-ft{color:#8696a0;font-size:13px}
+  .hl{position:relative;margin:0;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .hl .e-body,.hl .hl-back{font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      padding:8px 10px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;letter-spacing:normal}
+  .hl .hl-back{position:absolute;inset:0;color:transparent;pointer-events:none;overflow:hidden;border-radius:6px}
+  .hl .hl-back mark{background:#e7dcf7;color:transparent;border-radius:4px;box-shadow:0 0 0 1px #d4c2f0}
+  .hl .e-body{position:relative;display:block;width:100%;min-height:96px;border:0;border-radius:6px;background:transparent;
+      resize:none;overflow:hidden;color:var(--ink)}
+  .ebtn{margin:6px 0 0}
+  .ebtn-l{display:flex;align-items:center;gap:6px}
+  .ebtn .ico{color:#027eb5;width:18px;text-align:center}
+  .ebtn input[type=text]{color:#027eb5;font-weight:600;margin:0}
+  .ebtn input.sub{color:var(--muted);font-weight:400;font-size:12px;font-family:ui-monospace,monospace;margin:4px 0 0 24px;width:calc(100% - 24px)}
+  .ebtn .x{background:transparent;color:var(--muted);padding:2px 8px;font-size:18px;line-height:1}
+  .ebtn .x:hover{color:var(--danger)}
+  .addbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .addbtns button{background:rgba(255,255,255,.75);color:#027eb5;border:1px dashed #9cc9e0;font-size:12px;padding:6px 11px}
+  .addbtns button:hover:not(:disabled){background:#fff}
+  .counters{font-size:12px;color:var(--muted);margin-top:8px}
+  .counters .over{color:var(--danger);font-weight:700}
+  .varrow{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .varrow:last-child{border-bottom:0}
+  .varrow .row{grid-column:1/-1;gap:8px}
+  .varrow .row input[data-desc]{flex:0 0 38%;min-width:150px}
+  .popover .poptit{font-size:13px;font-weight:600;margin:0 0 2px}
+  .popover .poptit code{color:var(--brand)}
+  .vchip{font-family:ui-monospace,monospace;font-size:12px;font-weight:700;color:var(--brand);background:#f3eefb;border-radius:6px;padding:2px 7px}
+  .cats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .cat{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--ink);display:block}
+  .cat:hover{border-color:#c9b6e8}
+  .cat input{margin:0 6px 0 0;vertical-align:-1px}
+  .cat span{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35}
+  .cat:has(input:checked){border-color:var(--brand);background:#f7f3fd;box-shadow:inset 0 0 0 1px var(--brand)}
+  .checklist{list-style:none;padding:0;margin:0 0 14px;font-size:13px}
+  .checklist li{padding:5px 0 5px 24px;position:relative;line-height:1.4}
+  .checklist li::before{position:absolute;left:0;top:4px;font-weight:700}
+  .checklist .bad{color:var(--danger)} .checklist .bad::before{content:"✕"}
+  .checklist .warn{color:var(--warn)} .checklist .warn::before{content:"!";left:5px}
+  .checklist .good{color:var(--ok)} .checklist .good::before{content:"✓"}
+  .checklist .idle{color:var(--muted)} .checklist .idle::before{content:"…"}
+  pre.json{background:#1f1630;color:#e8defa;border-radius:8px;padding:12px;font-size:12px;overflow:auto;max-height:320px}
+  .bad-text{color:var(--danger)}
+  /* Mockup do WhatsApp: é como o cliente recebe, com os exemplos no lugar das variáveis. */
+  .wa{border-radius:16px;overflow:hidden;border:1px solid var(--line)}
+  .wa-top{background:#008069;color:#fff;padding:9px 12px;display:flex;gap:10px;align-items:center}
+  .wa-top img{width:34px;height:34px;border-radius:50%;background:#fff;object-fit:contain;padding:2px}
+  .wa-top b{font-size:14px;display:block} .wa-top span{font-size:11px;opacity:.85}
+  .wa-chat{background:#efeae2;padding:14px 12px 18px;min-height:240px;
+           background-image:radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px);background-size:14px 14px}
+  .wa-bubble{background:#fff;border-radius:0 8px 8px 8px;padding:6px 9px 6px;max-width:94%;box-shadow:0 1px 1px rgba(0,0,0,.13);
+             font-size:14px;line-height:1.42;white-space:pre-wrap;word-break:break-word}
+  .wa-bubble .hd{font-weight:700;margin-bottom:3px}
+  .wa-bubble .ft{color:#8696a0;font-size:12.5px;margin-top:4px}
+  .wa-bubble .hora{float:right;font-size:11px;color:#8696a0;margin:8px 0 -4px 12px}
+  .wa-bubble code{font-family:ui-monospace,monospace;font-size:13px}
+  .wa-bubble .ex{background:#fff4c2;border-radius:3px;box-shadow:0 0 0 1px #f3e2a0}
+  .wa-btns{max-width:94%}
+  .wa-btn{background:#fff;border-radius:8px;margin-top:3px;padding:9px;text-align:center;color:#027eb5;font-size:14px;
+          font-weight:500;box-shadow:0 1px 1px rgba(0,0,0,.1)}
+  .tplrow{display:flex;justify-content:space-between;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:13px}
+  .tplrow:last-child{border-bottom:0}
+  .tplrow .nome{font-weight:600;word-break:break-all}
+  .tplrow .motivo{font-size:12px;color:var(--danger);margin-top:3px}
+  .tplrow .acoes{margin-top:4px;font-size:12px;display:flex;gap:10px;justify-content:flex-end}
+  .tplrow .acoes a{color:var(--brand);font-weight:600;text-decoration:none}
+  .tplrow .acoes a:hover{text-decoration:underline}
+  /* ------------------------------------------------------ remover templates */
+  main.full{grid-template-columns:1fr}
+  .cap{height:14px;background:#e9edef;border-radius:999px;overflow:hidden;display:flex;margin:6px 0 4px}
+  .cap .fica{background:var(--brand)} .cap .sai{background:repeating-linear-gradient(135deg,#e24b3f 0 6px,#f07a70 6px 12px)}
+  .cap-leg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .cap-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+  .chip{background:#eef1f3;color:var(--muted);padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600}
+  .chip:hover{background:#e2e6e9} .chip.active{background:var(--brand);color:#fff}
+  .chip b{font-weight:700;opacity:.75;margin-left:3px}
+  .acoesr{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
+  .acoesr button{font-size:13px;padding:8px 13px}
+  .btn-danger-ghost{background:var(--danger-bg);color:var(--danger)} .btn-danger-ghost:hover{background:#f9d9d5}
+  .btn-ok-ghost{background:var(--ok-bg);color:var(--ok)} .btn-ok-ghost:hover{background:#d6f0e1}
+  .rhead,.rrow{display:grid;grid-template-columns:26px 92px minmax(0,1fr) 110px 170px 74px;gap:10px;align-items:center}
+  .rhead{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600;padding:0 12px 6px;border-bottom:1px solid var(--line)}
+  .rrow{padding:9px 12px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;border-left:3px solid transparent}
+  .rrow:hover{background:#fafbfc}
+  .rrow.sel{background:#fdf1f0;border-left-color:var(--danger)}
+  .rrow.prot{background:#f3faf6;border-left-color:var(--ok);cursor:default}
+  .rrow.trav{cursor:default;opacity:.7}
+  .rrow input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--danger);cursor:pointer}
+  .rrow .nome{font-weight:600;word-break:break-all}
+  .rrow .rmeta{margin-top:3px;display:flex;gap:4px;flex-wrap:wrap}
+  .rrow .sub{display:block;font-size:11px;color:var(--muted)}
+  .lock{font-size:12px;padding:5px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .lock:hover{border-color:var(--ok);color:var(--ok)}
+  .lock.on{background:var(--ok);border-color:var(--ok);color:#fff}
+  .lock:disabled{opacity:1;cursor:not-allowed}
+  .rver{background:transparent;color:var(--brand);font-size:12px;padding:4px}
+  .rtexto{grid-column:3/-1;background:#f7f5fb;border-radius:8px;padding:10px 12px;white-space:pre-wrap;font-size:13px;cursor:auto}
+  .rtexto .hd{font-weight:700;margin-bottom:4px} .rtexto .ft{color:var(--muted);font-size:12px;margin-top:6px}
+  @media(max-width:760px){
+    .rhead{display:none}
+    .rrow{grid-template-columns:26px 1fr auto}
+    .rrow .rdata,.rrow .ruso{grid-column:2/-1;font-size:12px}
+    .rrow .lock{grid-column:3;grid-row:1}
+    .rtexto{grid-column:1/-1}
+  }
+  /* 250 linhas esticariam a página: a lista rola por dentro e atalhos e barra ficam à vista. */
+  #rList{max-height:max(360px,calc(100vh - 330px));overflow-y:auto;overscroll-behavior:contain;
+         scrollbar-width:thin;scrollbar-color:#cdbfe6 transparent;border-bottom:1px solid var(--line)}
+  #rList::-webkit-scrollbar{width:8px}
+  #rList::-webkit-scrollbar-thumb{background:#cdbfe6;border-radius:999px}
+  .rbar{position:sticky;bottom:14px;z-index:15;background:#fff;border:1px solid var(--line);border-radius:12px;
+        box-shadow:0 10px 30px rgba(17,27,33,.16);padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .rbar .txt{flex:1;min-width:200px;font-size:14px}
+  .modal-bg{position:fixed;inset:0;background:rgba(17,27,33,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px}
+  .modal{background:#fff;border-radius:14px;max-width:580px;width:100%;max-height:92vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal h3{margin:0 0 10px;font-size:18px}
+  .modal ul{margin:0;padding:8px 12px 8px 28px;font-size:12px}
+  #toasts{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;flex-direction:column;gap:8px;max-width:360px}
+  .toast{background:#fff;border:1px solid var(--line);border-left:5px solid var(--brand);border-radius:10px;padding:12px 34px 12px 14px;
+         box-shadow:0 10px 30px rgba(17,27,33,.18);font-size:13px;position:relative;animation:entra .25s ease-out}
+  .toast.ok{border-left-color:var(--ok)} .toast.err{border-left-color:var(--danger)}
+  .toast a{color:var(--brand);font-weight:600}
+  .toast .fechar{position:absolute;top:6px;right:6px;background:transparent;color:var(--muted);padding:2px 7px;font-size:16px}
+  @keyframes entra{from{transform:translateY(10px);opacity:0}}
 </style>
 </head>
 <body>
@@ -124,11 +290,16 @@
     <h1>Disparo<span>Mais</span></h1>
     <div class="tagline">Campanhas de WhatsApp</div>
   </div>
+  <nav class="views">
+    <button class="view-btn active" data-view="disparo">Disparo</button>
+    <button class="view-btn" data-view="criar" id="navCriar">Criar template</button>
+    <button class="view-btn" data-view="remover">Remover templates</button>
+  </nav>
   <div class="conn"><span class="dot" id="dot"></span><span id="connText">verificando conexão…</span>
     <span id="qualityChip"></span></div>
 </header>
 
-<main>
+<main id="viewDisparo">
 <div>
   <div id="qualityBanner"></div>
   <!-- 1. TEMPLATE -->
@@ -219,7 +390,9 @@
 
   <!-- 5. PROGRESSO -->
   <section class="card hidden" id="progressCard">
-    <h2>Progresso</h2>
+    <h2 style="display:flex;align-items:center;justify-content:space-between">Progresso
+      <button class="btn-ghost" id="closeProgBtn" title="Fecha o acompanhamento para montar outro disparo (a campanha continua no histórico)"
+              style="padding:5px 12px;font-size:12px;text-transform:none;letter-spacing:0">✕ Fechar</button></h2>
     <div id="progLabel" class="muted" style="font-size:13px"></div>
     <div class="bar"><div id="progBar" style="width:0%"></div></div>
     <div id="progAlert"></div>
@@ -261,11 +434,153 @@
 </aside>
 </main>
 
+<!-- ============================================================ CRIAR TEMPLATE -->
+<main id="viewCriar" class="hidden">
+<div>
+  <section class="card">
+    <h2><span class="step">1</span>Tipo do template</h2>
+    <div class="cats">
+      <label class="cat"><input type="radio" name="cCat" value="MARKETING" checked><b>Marketing</b>
+        <span>Oferta, negociação, reativação, novidade. É como a Meta classifica a maioria das campanhas.</span></label>
+      <label class="cat"><input type="radio" name="cCat" value="UTILITY"><b>Utilidade</b>
+        <span>Aviso sobre algo que o cliente já contratou: vencimento, confirmação, atualização. Mais barata.</span></label>
+    </div>
+    <div class="hint" id="cCatHint"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span>Escreva a mensagem</h2>
+    <div class="hint" style="margin:-6px 0 12px">Escreva direto no balão, como se fosse mandar pelo WhatsApp. Onde o texto muda
+      de cliente para cliente, clique em <b>+ Variável</b>: ela entra como <b>{{1}}</b>, <b>{{2}}</b>… no formato da Meta, e a
+      numeração se ajusta sozinha na ordem do texto.</div>
+    <div class="toolbar">
+      <button data-fmt="*" title="Negrito"><b>N</b></button>
+      <button data-fmt="_" title="Itálico"><i>I</i></button>
+      <button data-fmt="~" title="Tachado"><s>T</s></button>
+      <button data-fmt="```" title="Monoespaçado" class="mono">{ }</button>
+      <span class="sep"></span>
+      <div class="pop"><button id="emojiBtn" title="Emoji">😊</button><div class="popover emojis hidden" id="emojiPop"></div></div>
+      <div class="pop"><button id="varBtn" class="btn-var">+ Variável</button><div class="popover hidden" id="varPop"></div></div>
+    </div>
+    <div class="chatbg">
+      <div class="ebubble">
+        <span class="rot">Título <i>(opcional)</i></span>
+        <input type="text" id="cHeader" class="e-hd" placeholder="Digite o título" autocomplete="off">
+        <span class="rot">Mensagem</span>
+        <div class="hl"><div class="hl-back" id="cBodyBack"></div>
+          <textarea id="cBody" class="e-body" placeholder="Digite a mensagem"></textarea></div>
+        <span class="rot">Rodapé <i>(opcional)</i></span>
+        <input type="text" id="cFooter" class="e-ft" placeholder="Digite o rodapé" autocomplete="off">
+        <span class="rot hidden" id="rotBotoes">Botões</span>
+        <div id="cButtons"></div>
+      </div>
+      <div class="addbtns">
+        <button data-add="QUICK_REPLY">↩ Resposta rápida</button>
+        <button data-add="URL">↗ Botão de link</button>
+        <button data-add="PHONE_NUMBER">📞 Botão de ligar</button>
+      </div>
+    </div>
+    <div class="counters" id="cCounters"></div>
+  </section>
+
+  <section class="card hidden" id="varsCard">
+    <h2><span class="step">3</span>Exemplos das variáveis</h2>
+    <div class="hint" style="margin:-6px 0 6px">A Meta só aprova com um exemplo realista de cada variável — digite um para cada uma.
+      A descrição é opcional e só serve para você: no disparo ela aparece ao lado do número e sugere a coluna da planilha.</div>
+    <div id="cVars"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step" id="stepNome">4</span>Nome do template</h2>
+    <div class="row">
+      <input type="text" id="cName" placeholder="gerado a partir do texto" autocomplete="off" class="mono">
+      <button class="btn-ghost" id="cNameAuto" style="flex:0 0 auto;min-width:auto" title="Gerar de novo a partir do texto">↻ Gerar</button>
+      <select id="cLang" style="flex:0 0 110px;min-width:110px" title="Idioma">
+        <option value="pt_BR">pt_BR</option><option value="pt_PT">pt_PT</option><option value="en_US">en_US</option>
+        <option value="es_ES">es_ES</option><option value="es_MX">es_MX</option>
+      </select>
+    </div>
+    <div class="hint" id="cNameHint"></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step" id="stepEnviar">5</span>Enviar para aprovação</h2>
+    <ul class="checklist" id="cCheck"><li class="idle">Escreva a mensagem para começar.</li></ul>
+    <button class="btn-big" id="cSend" disabled>Enviar para a Meta aprovar</button>
+    <div id="cResult"></div>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <details style="flex:1"><summary class="hint" style="cursor:pointer">Ver o JSON que vai para a Meta</summary>
+        <pre class="json" id="cJson"></pre></details>
+      <button class="btn-ghost" id="cClear" style="flex:0 0 auto">Limpar tudo</button>
+    </div>
+  </section>
+</div>
+
+<aside>
+  <section class="card">
+    <h2>Como o cliente recebe</h2>
+    <div class="wa">
+      <div class="wa-top"><img src="/imagens/logos.png" alt=""><div><b id="waNome">Locar Mais</b><span>conta comercial</span></div></div>
+      <div class="wa-chat" id="cPreview"></div>
+    </div>
+    <div class="hint">Em amarelo, os exemplos no lugar das variáveis.</div>
+  </section>
+
+  <section class="card">
+    <h2>Acompanhar aprovação</h2>
+    <div class="row">
+      <input type="text" id="cListSearch" placeholder="Filtrar por nome…">
+      <button class="btn-ghost" id="cListReload" style="flex:0 0 auto;min-width:auto">Atualizar</button>
+    </div>
+    <div class="hint" id="cListInfo"></div>
+    <div id="cList" style="margin-top:6px"><div class="muted" style="font-size:13px">Carregando…</div></div>
+  </section>
+</aside>
+</main>
+
+<!-- ========================================================== REMOVER TEMPLATES -->
+<main id="viewRemover" class="full hidden">
+<div>
+  <section class="card">
+    <h2>Limpar templates da conta</h2>
+    <div class="hint" style="margin:-6px 0 12px">Marque com <b>🔒 Manter</b> o que precisa ficar. Depois selecione o que sai — um a um,
+      pelos atalhos ou com <b>Selecionar todo o resto</b>. Nada é apagado antes da confirmação final.</div>
+    <div class="stats" id="rStats"></div>
+    <div class="cap" id="rCap"></div>
+    <div class="cap-leg" id="rCapLeg"></div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="align-items:center">
+      <input type="text" id="rBusca" placeholder="Buscar por nome… (ex.: ago_2026, cobranca)">
+      <select id="rOrdem" style="flex:0 0 220px">
+        <option value="antigos">Mais antigos primeiro</option>
+        <option value="recentes">Mais recentes primeiro</option>
+        <option value="uso">Disparados há mais tempo</option>
+        <option value="nome">Nome (A–Z)</option>
+      </select>
+      <button class="btn-ghost" id="rRecarregar" style="flex:0 0 auto;min-width:auto">Atualizar</button>
+    </div>
+    <div class="chips" id="rFiltros"></div>
+    <div class="acoesr" id="rAcoes"></div>
+    <div class="rhead"><span></span><span>Manter</span><span>Template</span><span>Data no nome</span><span>Último disparo</span><span></span></div>
+    <div id="rList"><div class="muted" style="padding:14px;font-size:13px">Carregando…</div></div>
+  </section>
+
+  <div class="rbar" id="rBar"></div>
+</div>
+</main>
+
+<div class="modal-bg hidden" id="rModal"><div class="modal" id="rModalBox"></div></div>
+
+<div id="toasts"></div>
+
 <script>
 const state = {
   templates: [], template: null, upload: null, mapping: {}, validation: null, campaign: null, historico: [],
   headerMedia: null, campaignId: null, poll: null, samples: [], sampleIndex: 0,
-  quality: null, phoneStatus: null, conduzindo: null
+  quality: null, phoneStatus: null, conduzindo: null,
+  fechadas: new Set()  // campanhas que o usuário fechou: não reabrem sozinhas no refresh do histórico
 };
 
 const $ = id => document.getElementById(id);
@@ -294,6 +609,7 @@ async function loadConnection() {
     const conn = await api('/api/connection');
     $('dot').className = 'dot on';
     $('connText').textContent = `${conn.display_phone_number} · ${conn.verified_name}`;
+    if (conn.verified_name) $('waNome').textContent = conn.verified_name;
     state.quality = (conn.quality_rating || '').toUpperCase();
     state.phoneStatus = (conn.status || '').toUpperCase();
     renderQualidade(conn);
@@ -488,11 +804,14 @@ function renderVarMapping() {
     return;
   }
   const columns = state.upload.columns;
+  // Templates criados pela aba "Criar template" lembram o nome original de cada {{1}}, {{2}}.
+  const apelidos = armazenado.ler('disparo.apelidos', {})[`${state.template.name}|${state.template.language}`] || {};
   box.innerHTML = '<label>Variáveis do template</label>' + vars.map(v => {
     const current = state.mapping[v.key] || {};
-    const guess = current.value || columns.find(c => c.toLowerCase() === String(v.name).toLowerCase()) || '';
+    const apelido = apelidos[v.key];
+    const guess = current.value || columns.find(c => colunaCombina(c, v.name, apelido)) || '';
     return `<div class="varmap">
-      <div><span class="k">{{${esc(v.name)}}}</span> <span class="muted">· ${esc(v.section)}</span></div>
+      <div><span class="k">{{${esc(v.name)}}}</span>${apelido ? ` <b>= ${esc(apelido)}</b>` : ''} <span class="muted">· ${esc(v.section)}</span></div>
       <div class="row" style="margin-top:6px">
         <select data-var="${esc(v.key)}" data-role="type">
           <option value="column"${current.type !== 'fixed' ? ' selected' : ''}>Coluna do arquivo</option>
@@ -511,6 +830,19 @@ function renderVarMapping() {
   box.querySelectorAll('[data-var]').forEach(el => el.addEventListener('change', syncMapping));
   box.querySelectorAll('input[data-role=fixed]').forEach(el => el.addEventListener('input', syncMapping));
   syncMapping();
+}
+
+// "Nome do cliente" sugere a coluna "nome"; "valor" sugere "valor_parcela". Compara por palavra,
+// sem acento, para a descrição dada na criação do template achar a coluna da planilha.
+function colunaCombina(coluna, nomeVariavel, apelido) {
+  const c = slug(coluna);
+  if (!c) return false;
+  if (c === slug(nomeVariavel)) return true;
+  const a = slug(apelido || '');
+  if (!a) return false;
+  const palavrasA = a.split('_').filter(p => p.length > 2 && !STOPWORDS.has(p));
+  const palavrasC = c.split('_').filter(p => p.length > 2 && !STOPWORDS.has(p));
+  return a === c || palavrasA.some(p => palavrasC.includes(p));
 }
 
 function syncMapping() {
@@ -828,7 +1160,7 @@ async function conduzirDisparo(id) {
 // Abre o painel de acompanhamento de qualquer campanha (nova, em andamento ou já encerrada).
 function abrirCampanha(id, opcoes = {}) {
   state.campaignId = id;
-  history.replaceState(null, '', '#c=' + id);  // permite recarregar/compartilhar o link da campanha
+  state.fechadas.delete(id);
   $('progressCard').classList.remove('hidden');
   if (opcoes.scroll) $('progressCard').scrollIntoView({ behavior: 'smooth' });
   marcarHistoricoSelecionado();
@@ -1010,6 +1342,9 @@ $('resumeBtn').addEventListener('click', async () => {
   } catch (e) { alert(e.message); }
 });
 
+$('closeProgBtn').addEventListener('click', fecharCampanha);
+if (/^#c=/.test(location.hash)) history.replaceState(null, '', location.pathname);
+
 $('csvBtn').addEventListener('click', () => {
   if (state.campaignId) window.location = `/api/campaigns/${state.campaignId}/results.csv`;
 });
@@ -1064,13 +1399,1096 @@ function marcarHistoricoSelecionado() {
 }
 
 // Ao abrir/recarregar a página, volta a acompanhar sozinho a campanha que estiver disparando.
+// Ao abrir/recarregar a página só volta sozinho para campanha que ainda está disparando:
+// uma já encerrada ficaria na tela misturada com o próximo disparo. As encerradas continuam
+// a um clique no histórico.
 function reconectarEmAndamento() {
   if (state.campaignId) return;
-  const daUrl = (location.hash.match(/^#c=([a-f0-9]+)$/) || [])[1];
-  if (daUrl && (state.historico || []).some(c => c.id === daUrl)) { abrirCampanha(daUrl); return; }
-  const ativa = (state.historico || []).find(c => c.status === 'running' || c.status === 'pending');
+  const ativa = (state.historico || []).find(c =>
+    (c.status === 'running' || c.status === 'pending') && !state.fechadas.has(c.id));
   if (ativa) abrirCampanha(ativa.id);
 }
+
+// Tira a campanha da tela para montar outro disparo. Não cancela nada: se ela ainda estiver
+// enviando, segue no servidor (e nesta aba, quando é ela quem conduz os lotes).
+function fecharCampanha() {
+  if (state.campaignId) state.fechadas.add(state.campaignId);
+  state.campaignId = null;
+  state.campaign = null;
+  clearInterval(state.poll);
+  $('progressCard').classList.add('hidden');
+  $('progAlert').innerHTML = '';
+  $('progErrors').innerHTML = '';
+  marcarHistoricoSelecionado();
+}
+
+// ========================================================== criar template
+// A criação vai direto para a Graph API: o texto é escrito com variáveis de nome
+// ({{nome}}) e o servidor converte para {{1}}, {{2}} na hora de enviar à Meta.
+
+// Preferências deste navegador (rascunho, templates acompanhados, nomes das variáveis).
+// Pode voltar vazio em janela anônima — a tela funciona igual, só sem memória.
+const armazenado = {
+  ler(chave, padrao) { try { return JSON.parse(localStorage.getItem(chave)) ?? padrao; } catch (e) { return padrao; } },
+  gravar(chave, valor) { try { localStorage.setItem(chave, JSON.stringify(valor)); } catch (e) { /* sem storage */ } }
+};
+
+const criar = {
+  view: 'disparo', buttons: [], examples: {}, descricoes: {}, nameAuto: true, foco: null,
+  lista: [], listaCarregada: false, varsChave: null, timer: null, seq: 0, validacao: null, enviando: false, proximoId: 1
+};
+
+const VAR_RE = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const STOPWORDS = new Set(('a o as os e de da do das dos em no na nos nas um uma para pra por com sem seu sua seus suas ' +
+  'voce ola oi que se ao aos ja so tem ha pelo pela esta este isso isto nosso nossa aqui sobre como mais muito ' +
+  'locarmais locar').split(' '));  // a marca está em quase todo texto: não diferencia um template do outro
+const PROMO_RE = /promo|desconto|oferta|aproveit|imperd[ií]vel|cupom|gr[aá]tis|black ?friday|liquida|condi[cç][aã]o especial|novidade|lan[cç]amento|garanta|exclusiv/i;
+const LIMITE_TEMPLATES = 250;  // contas não verificadas na Meta
+// Quase toda campanha da conta foi classificada pela Meta como Marketing.
+const CATEGORIA_PADRAO = 'MARKETING';
+
+const ICONE_BOTAO = { QUICK_REPLY: '↩', URL: '↗', PHONE_NUMBER: '📞' };
+const LIMITE_BOTAO = { QUICK_REPLY: 10, URL: 2, PHONE_NUMBER: 1 };
+const PLACEHOLDER_BOTAO = { QUICK_REPLY: 'Digite o texto da resposta', URL: 'Digite o texto do botão', PHONE_NUMBER: 'Digite o texto do botão' };
+
+const STATUS_TPL = {
+  APPROVED: ['Aprovado', 'b-ok'], PENDING: ['Em análise', 'b-warn pulse'], REJECTED: ['Rejeitado', 'b-err'],
+  PAUSED: ['Pausado', 'b-warn'], DISABLED: ['Desativado', 'b-err'], IN_APPEAL: ['Em recurso', 'b-warn'],
+  PENDING_DELETION: ['Excluindo', 'b-mute'], DELETED: ['Excluído', 'b-mute'], LIMIT_EXCEEDED: ['Limite excedido', 'b-err']
+};
+const MOTIVO_REJEICAO = {
+  INVALID_FORMAT: 'formato inválido — variáveis, exemplos ou texto fora do padrão',
+  TAG_CONTENT_MISMATCH: 'o conteúdo não combina com a categoria escolhida',
+  PROMOTIONAL: 'conteúdo promocional numa categoria que não é Marketing',
+  INCORRECT_CATEGORY: 'categoria incorreta', ABUSIVE_CONTENT: 'conteúdo considerado abusivo', SCAM: 'suspeita de golpe'
+};
+
+// Exemplo sugerido pela descrição da variável: a Meta rejeita exemplo genérico como "teste".
+const EXEMPLOS = [
+  [/nome|cliente|locat|respons/, () => 'Maria Silva'],
+  [/valor|preco|total|parcela|mensal|saldo|debito|divida/, () => 'R$ 1.250,00'],
+  [/vencimento|data|dia|prazo|limite|validade/, () => new Date(Date.now() + 7 * 864e5).toLocaleDateString('pt-BR')],
+  [/contrato|pedido|protocolo|codigo|numero|fatura|boleto/, () => '482913'],
+  [/placa/, () => 'BRA2E19'],
+  [/veiculo|carro|modelo|moto/, () => 'Onix 1.0 2024'],
+  [/link|url|site/, () => 'https://exemplo.com.br/fatura/482913'],
+  [/telefone|whats|celular|contato/, () => '(44) 99999-8888'],
+  [/endereco|rua|local|loja|unidade/, () => 'Av. Brasil, 1234 – Centro'],
+  [/hora|horario/, () => '14h30'],
+  [/cidade/, () => 'Maringá'],
+  [/desconto|percent/, () => '15%'],
+  [/empresa|imobiliaria|parceiro/, () => 'Imobiliária Central']
+];
+
+// Descrições rápidas no "+ Variável". Só ajudam quem cria e quem dispara: à Meta vai {{n}}.
+const DESCRICOES_SUGERIDAS = ['Nome do cliente', 'Valor', 'Data de vencimento', 'Nº do contrato',
+  'Veículo', 'Placa', 'Protocolo', 'Data limite'];
+
+const EMOJIS = '😊 👋 🙏 👍 ✅ ⚠️ ❗ 📅 ⏰ 💰 💳 🧾 🚗 🔑 📍 📞 💬 📄 👉 🎉 🔥 ⭐ 🤝 😉'.split(' ');
+
+const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+const slug = s => semAcento(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+function varsDe(texto) {
+  const vistos = [];
+  for (const m of String(texto || '').matchAll(VAR_RE)) if (!vistos.includes(m[1])) vistos.push(m[1]);
+  return vistos;
+}
+
+function sugerirExemplo(descricao, noLink) {
+  if (noLink) return 'abc123';
+  const n = semAcento(descricao).toLowerCase();
+  const achado = n && EXEMPLOS.find(([re]) => re.test(n));
+  return achado ? achado[1]() : '';
+}
+
+function nomeExiste(nome, idioma = $('cLang').value) {
+  return criar.lista.find(t => t.name === nome && t.language === idioma);
+}
+
+// Mesmo padrão dos nomes que já estão na conta: assunto + data (ex.: aviso_pendencia_23_set_2026).
+function gerarNome() {
+  const fonte = ($('cHeader').value.trim() + ' ' + $('cBody').value).replace(VAR_RE, ' ');
+  const palavras = slug(fonte).split('_')
+    .filter(p => p.length > 1 && !STOPWORDS.has(p) && !/^\d+$/.test(p)).slice(0, 4);
+  if (!palavras.length) return '';
+  const hoje = new Date();
+  const base = `${palavras.join('_')}_${hoje.getDate()}_${MESES[hoje.getMonth()]}_${hoje.getFullYear()}`;
+  let nome = base, n = 2;
+  while (nomeExiste(nome)) nome = `${base}_${n++}`;
+  return nome;
+}
+
+const pareceMarketing = () => PROMO_RE.test(`${$('cHeader').value} ${$('cBody').value}`);
+const categoria = () => (document.querySelector('input[name=cCat]:checked') || {}).value || '';
+function marcarCategoria(valor) {
+  document.querySelectorAll('input[name=cCat]').forEach(r => { r.checked = r.value === valor; });
+}
+
+const ordenarBotoes = bs => [...bs.filter(b => b.type === 'QUICK_REPLY'), ...bs.filter(b => b.type !== 'QUICK_REPLY')];
+
+// Cada parte do template numera as próprias variáveis a partir de 1 (regra da Meta):
+// título, mensagem e cada link de botão. Exemplo e descrição ficam em "<seção>:<n>".
+function variaveisDoRascunho() {
+  const lista = [];
+  varsDe($('cHeader').value).forEach(n => lista.push({ secao: 'header', n, onde: 'no título' }));
+  varsDe($('cBody').value).forEach(n => lista.push({ secao: 'body', n, onde: 'na mensagem' }));
+  criar.buttons.filter(b => b.type === 'URL').forEach(b => varsDe(b.url).forEach(n =>
+    lista.push({ secao: `btn:${b.id}`, n, onde: `no final do link "${b.text || 'botão'}"`, link: true })));
+  return lista.map(v => ({ ...v, chave: `${v.secao}:${v.n}` }));
+}
+
+function secaoDoCampo(el) {
+  if (el === $('cHeader')) return 'header';
+  const linha = el.closest && el.closest('.ebtn');
+  return linha ? `btn:${linha.dataset.id}` : 'body';
+}
+
+// Deixa as variáveis de um texto em 1..n, na ordem em que aparecem, levando junto o exemplo
+// e a descrição de cada uma. Assim apagar ou inserir no meio nunca deixa buraco na sequência,
+// e um {{nome}} digitado à mão vira número na hora.
+function renumerarTexto(texto, secao) {
+  const ordem = varsDe(texto);
+  const mapa = new Map(ordem.map((n, i) => [n, String(i + 1)]));
+  const trocar = t => t.replace(VAR_RE, (m, n) => mapa.has(n) ? `{{${mapa.get(n)}}}` : m);
+  for (const dicionario of [criar.examples, criar.descricoes]) {
+    const antigo = {};
+    for (const k of Object.keys(dicionario)) {
+      if (k.startsWith(secao + ':')) { antigo[k.slice(secao.length + 1)] = dicionario[k]; delete dicionario[k]; }
+    }
+    ordem.forEach((n, i) => { if (antigo[n] !== undefined) dicionario[`${secao}:${i + 1}`] = antigo[n]; });
+  }
+  return { texto: trocar(texto), trocar };
+}
+
+function renumerarCampo(el, secao) {
+  const { texto, trocar } = renumerarTexto(el.value, secao);
+  if (texto === el.value) return texto;
+  const ativo = document.activeElement === el;
+  const cursor = ativo ? trocar(el.value.slice(0, el.selectionStart)).length : 0;
+  el.value = texto;
+  if (ativo) el.setSelectionRange(cursor, cursor);
+  return texto;
+}
+
+function normalizarVariaveis() {
+  renumerarCampo($('cHeader'), 'header');
+  renumerarCampo($('cBody'), 'body');
+  criar.buttons.filter(b => b.type === 'URL').forEach(b => {
+    const campo = $('cButtons').querySelector(`.ebtn[data-id="${b.id}"] [data-campo=url]`);
+    b.url = campo ? renumerarCampo(campo, `btn:${b.id}`) : renumerarTexto(b.url || '', `btn:${b.id}`).texto;
+  });
+}
+
+function rascunho() {
+  const hd = $('cHeader').value.trim();
+  const exemplos = (texto, secao) => Object.fromEntries(varsDe(texto).map(n => [n, criar.examples[`${secao}:${n}`] || '']));
+  return {
+    name: nomeFinal(), category: categoria(), language: $('cLang').value,
+    header: hd ? { type: 'TEXT', text: hd, examples: exemplos(hd, 'header') } : { type: 'NONE' },
+    body: { text: $('cBody').value, examples: exemplos($('cBody').value, 'body') },
+    footer: $('cFooter').value.trim(),
+    buttons: criar.buttons.map(b => ({
+      type: b.type, text: b.text || '', url: b.url || '', phone: b.phone || '',
+      example: criar.examples[`btn:${b.id}:1`] || ''
+    }))
+  };
+}
+
+// O que cada {{n}} representa, na chave que o disparo usa (header:1, body:2, button:0:1).
+function apelidosDoRascunho() {
+  const apelidos = {};
+  variaveisDoRascunho().forEach(v => {
+    const descricao = (criar.descricoes[v.chave] || '').trim();
+    if (!descricao) return;
+    if (!v.link) { apelidos[v.chave] = descricao; return; }
+    // O índice do botão é a posição no payload, que agrupa as respostas rápidas antes.
+    const indice = ordenarBotoes(criar.buttons).findIndex(b => `btn:${b.id}` === v.secao);
+    apelidos[`button:${indice}:${v.n}`] = descricao;
+  });
+  return apelidos;
+}
+
+// ------------------------------------------------------------- edição
+function autoAltura(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+
+function renderDestaque() {
+  $('cBodyBack').innerHTML = esc($('cBody').value).replace(/\{\{\s*[A-Za-z0-9_]+\s*\}\}/g, m => `<mark>${m}</mark>`) + '\n';
+}
+
+function inserir(el, antes, depois = '') {
+  const ini = el.selectionStart ?? el.value.length, fim = el.selectionEnd ?? el.value.length;
+  const sel = el.value.slice(ini, fim);
+  el.value = el.value.slice(0, ini) + antes + sel + depois + el.value.slice(fim);
+  el.focus();
+  // Sem seleção o cursor fica entre as marcas, pronto para digitar o texto formatado.
+  const pos = sel ? ini + antes.length + sel.length + depois.length : ini + antes.length;
+  el.setSelectionRange(pos, pos);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// Campos que aceitam variável: título, mensagem e link dos botões (o rodapé não aceita).
+const aceitaVariavel = el => !!el && document.body.contains(el) &&
+  (el === $('cHeader') || el === $('cBody') || el.dataset.campo === 'url');
+
+function alvoDaVariavel() {
+  // O botão "+ Variável" não rouba o foco (mousedown cancelado): quem está ativo é o campo
+  // onde o cursor está. O último focado cobre o caso de o foco já ter saído.
+  if (aceitaVariavel(document.activeElement)) return document.activeElement;
+  return aceitaVariavel(criar.foco) ? criar.foco : $('cBody');
+}
+
+function renderBotoesEditor() {
+  $('rotBotoes').classList.toggle('hidden', !criar.buttons.length);
+  $('cButtons').innerHTML = criar.buttons.map(b => `
+    <div class="ebtn" data-id="${b.id}">
+      <div class="ebtn-l"><span class="ico">${ICONE_BOTAO[b.type]}</span>
+        <input type="text" data-campo="text" value="${esc(b.text)}" placeholder="${esc(PLACEHOLDER_BOTAO[b.type])}" autocomplete="off">
+        <button class="x" title="Remover botão">×</button></div>
+      ${b.type === 'URL' ? `<input type="text" class="sub" data-campo="url" value="${esc(b.url)}" autocomplete="off"
+          placeholder="Digite o link (https://…)">` : ''}
+      ${b.type === 'PHONE_NUMBER' ? `<input type="text" class="sub" data-campo="phone" value="${esc(b.phone)}" autocomplete="off"
+          placeholder="Digite o telefone com DDI e DDD">` : ''}
+    </div>`).join('');
+
+  $('cButtons').querySelectorAll('.ebtn').forEach(linha => {
+    const botao = criar.buttons.find(b => String(b.id) === linha.dataset.id);
+    linha.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', () => { botao[input.dataset.campo] = input.value; aoMudar(); });
+      if (input.dataset.campo === 'url') input.addEventListener('focus', () => { criar.foco = input; });
+    });
+    linha.querySelector('.x').addEventListener('click', () => {
+      criar.buttons = criar.buttons.filter(b => b !== botao);
+      renderBotoesEditor(); aoMudar();
+    });
+  });
+
+  document.querySelectorAll('[data-add]').forEach(btn => {
+    const tipo = btn.dataset.add;
+    btn.disabled = criar.buttons.length >= 10 || criar.buttons.filter(b => b.type === tipo).length >= LIMITE_BOTAO[tipo];
+  });
+}
+
+function adicionarBotao(tipo, texto = '', extra = {}) {
+  const { id, example, descricao, ...resto } = extra;  // o id é sempre novo: um id salvo poderia colidir
+  const botao = { url: '', phone: '', ...resto, id: criar.proximoId++, type: tipo, text: texto || '' };
+  criar.buttons.push(botao);
+  if (example) criar.examples[`btn:${botao.id}:1`] = example;
+  if (descricao) criar.descricoes[`btn:${botao.id}:1`] = descricao;
+}
+
+function renderVars() {
+  const vars = variaveisDoRascunho();
+  $('varsCard').classList.toggle('hidden', !vars.length);
+  $('stepNome').textContent = vars.length ? '4' : '3';
+  $('stepEnviar').textContent = vars.length ? '5' : '4';
+
+  // Só reconstrói quando o conjunto muda: assim o campo em edição não perde o foco.
+  // Os valores entram na chave porque a renumeração pode mover um exemplo de {{2}} para {{1}}.
+  const chave = vars.map(v => `${v.chave}|${v.onde}`).join('~') + '#' +
+    vars.map(v => `${criar.descricoes[v.chave] || ''}\u0001${criar.examples[v.chave] || ''}`).join('\u0002');
+  if (chave === criar.varsChave) return;
+  criar.varsChave = chave;
+  const dica = v => {
+    const sugestao = sugerirExemplo(criar.descricoes[v.chave], v.link);
+    return sugestao ? `Exemplo — ex.: ${sugestao}` : 'Digite um exemplo realista';
+  };
+  $('cVars').innerHTML = vars.map(v => `
+    <div class="varrow">
+      <span class="vchip">{{${esc(v.n)}}}</span><span class="muted" style="font-size:12px">${esc(v.onde)}</span>
+      <div class="row">
+        <input type="text" data-desc="${esc(v.chave)}" value="${esc(criar.descricoes[v.chave] || '')}" placeholder="O que é? (opcional)">
+        <input type="text" data-ex="${esc(v.chave)}" value="${esc(criar.examples[v.chave] || '')}" placeholder="${esc(dica(v))}">
+      </div>
+    </div>`).join('');
+  // Digitar aqui atualiza a chave antes do aoMudar, para ele não reconstruir o campo em uso.
+  const digitou = () => { criar.varsChave = null; renderVarsChave(); aoMudar(); };
+  $('cVars').querySelectorAll('[data-ex]').forEach(el => el.addEventListener('input', () => {
+    criar.examples[el.dataset.ex] = el.value;
+    digitou();
+  }));
+  $('cVars').querySelectorAll('[data-desc]').forEach(el => el.addEventListener('input', () => {
+    criar.descricoes[el.dataset.desc] = el.value;
+    const exemplo = $('cVars').querySelector(`[data-ex="${CSS.escape(el.dataset.desc)}"]`);
+    const v = vars.find(x => x.chave === el.dataset.desc);
+    if (exemplo && v) exemplo.placeholder = dica(v);
+    digitou();
+  }));
+}
+
+function renderVarsChave() {
+  const vars = variaveisDoRascunho();
+  criar.varsChave = vars.map(v => `${v.chave}|${v.onde}`).join('~') + '#' +
+    vars.map(v => `${criar.descricoes[v.chave] || ''}\u0001${criar.examples[v.chave] || ''}`).join('\u0002');
+}
+
+function renderContadores() {
+  const conta = (rotulo, n, max) => `<span class="${n > max ? 'over' : ''}">${rotulo} ${n}/${max}</span>`;
+  const hd = $('cHeader').value.trim(), ft = $('cFooter').value.trim();
+  $('cCounters').innerHTML = [
+    hd ? conta('Título', hd.length, 60) : '',
+    conta('Mensagem', $('cBody').value.trim().length, 1024),
+    ft ? conta('Rodapé', ft.length, 60) : '',
+    criar.buttons.length ? `${criar.buttons.length}/10 botões` : ''
+  ].filter(Boolean).join(' · ');
+}
+
+const nomeFinal = () => $('cName').value.trim();
+
+function renderNomeHint() {
+  const nome = nomeFinal();
+  const existente = nome && nomeExiste(nome);
+  if (existente) {
+    const [rotulo] = STATUS_TPL[existente.status] || [existente.status];
+    $('cNameHint').innerHTML = `<span class="bad-text">Já existe um template com esse nome (${esc(rotulo.toLowerCase())}). ` +
+      `Clique em ↻ Gerar ou mude o nome.</span>`;
+  } else {
+    $('cNameHint').textContent = criar.nameAuto
+      ? 'Gerado a partir do texto, no padrão assunto_dia_mês_ano. Pode editar.'
+      : 'Só letras minúsculas, números e _. Nome + idioma não podem repetir na conta.';
+  }
+}
+
+function renderCatHint() {
+  $('cCatHint').innerHTML = categoria() === 'UTILITY' && pareceMarketing()
+    ? '<span class="bad-text">O texto tem cara de promoção: a Meta pode reclassificar como Marketing.</span>'
+    : 'A Meta confere o tipo na análise; se não bater com o texto, ela reclassifica ou rejeita.';
+}
+
+// Formatação do WhatsApp. As variáveis saem do caminho antes (viram marcadores) para que
+// um nome como {{data_limite}} não seja lido como _itálico_.
+function renderTexto(texto, secao) {
+  const nomes = [];
+  let html = esc(texto).replace(VAR_RE, (m, nome) => { nomes.push(nome); return `\u0000${nomes.length - 1}\u0000`; });
+  html = html
+    .replace(/```([\s\S]+?)```/g, '<code>$1</code>')
+    .replace(/\*([^*\n]+)\*/g, '<b>$1</b>')
+    .replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, '$1<i>$2</i>')
+    .replace(/~([^~\n]+)~/g, '<s>$1</s>');
+  return html.replace(/\u0000(\d+)\u0000/g, (m, i) => {
+    const nome = nomes[i];
+    const descricao = criar.descricoes[`${secao}:${nome}`];
+    return `<span class="ex" title="variável {{${esc(nome)}}}${descricao ? ' — ' + esc(descricao) : ''}">` +
+      `${esc(criar.examples[`${secao}:${nome}`] || `{{${nome}}}`)}</span>`;
+  });
+}
+
+function renderPreviewCriar() {
+  const hd = $('cHeader').value.trim(), body = $('cBody').value.trim(), ft = $('cFooter').value.trim();
+  const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  let html;
+  if (!hd && !body && !ft) {
+    html = '<span class="muted">Comece a escrever e a mensagem aparece aqui.</span>';
+  } else {
+    html = (hd ? `<div class="hd">${renderTexto(hd, 'header')}</div>` : '') + renderTexto(body, 'body') +
+      (ft ? `<div class="ft">${esc(ft)}</div>` : '');
+  }
+  html += `<span class="hora">${hora}</span>`;
+  const botoes = ordenarBotoes(criar.buttons).filter(b => (b.text || '').trim());
+  $('cPreview').innerHTML = `<div class="wa-bubble">${html}</div>` + (botoes.length
+    ? `<div class="wa-btns">${botoes.map(b => `<div class="wa-btn">${ICONE_BOTAO[b.type]} ${esc(b.text)}</div>`).join('')}</div>`
+    : '');
+}
+
+function aoMudar() {
+  normalizarVariaveis();
+  autoAltura($('cBody'));
+  renderDestaque();
+  renderVars();
+  if (criar.nameAuto) $('cName').value = gerarNome();
+  renderContadores();
+  renderNomeHint();
+  renderCatHint();
+  renderPreviewCriar();
+  $('cResult').innerHTML = '';
+  agendarValidacao();
+}
+
+// ------------------------------------------------------------ validação
+function agendarValidacao() {
+  clearTimeout(criar.timer);
+  criar.timer = setTimeout(validarRascunho, 350);
+}
+
+async function validarRascunho() {
+  const pedido = ++criar.seq;
+  try {
+    const data = await api('/api/templates/validate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rascunho())
+    });
+    if (pedido !== criar.seq) return;  // chegou resposta de um texto que já mudou
+    criar.validacao = data;
+    renderChecklist();
+  } catch (e) {
+    $('cCheck').innerHTML = `<li class="bad">Não consegui validar: ${esc(e.message)}</li>`;
+  }
+}
+
+function renderChecklist() {
+  const data = criar.validacao;
+  if (!data) return;
+  const r = rascunho();
+  const itens = [];
+  if (!r.body.text.trim()) {
+    itens.push('<li class="idle">Escreva a mensagem para começar.</li>');
+  } else {
+    const erros = [...data.errors];
+    const existente = r.name && nomeExiste(r.name);
+    if (existente) erros.unshift(`Já existe "${r.name}" em ${r.language} na conta — a Meta recusa nomes repetidos.`);
+    erros.forEach(e => itens.push(`<li class="bad">${esc(e)}</li>`));
+    data.warnings.forEach(w => itens.push(`<li class="warn">${esc(w)}</li>`));
+    if (!erros.length) {
+      const nVars = variaveisDoRascunho().length;
+      itens.push(`<li class="good">Dentro das regras da Meta${nVars ? ` · ${nVars} variáve${nVars === 1 ? 'l' : 'is'} com exemplo` : ''}.</li>`);
+      itens.push(`<li class="good">Vai como <b>${esc(r.name)}</b> · ${r.category === 'MARKETING' ? 'Marketing' : 'Utilidade'} · ${esc(r.language)}.</li>`);
+    }
+    $('cSend').dataset.erros = erros.length;
+  }
+  $('cCheck').innerHTML = itens.join('');
+  $('cSend').disabled = criar.enviando || !r.body.text.trim() || Number($('cSend').dataset.erros || 0) > 0;
+  $('cJson').textContent = JSON.stringify(data.payload, null, 2);
+}
+
+// ---------------------------------------------------------------- envio
+$('cSend').addEventListener('click', async () => {
+  const r = rascunho();
+  if (!confirm(`Enviar "${r.name}" para análise da Meta?\n\n` +
+    `Categoria: ${r.category === 'MARKETING' ? 'Marketing' : 'Utilidade'} · idioma ${r.language}\n\n` +
+    'Depois de enviado, o texto não pode mais ser alterado — para mudar, é preciso criar outro com outro nome.')) return;
+
+  const botao = $('cSend');
+  criar.enviando = true;
+  botao.disabled = true;
+  botao.innerHTML = '<span class="spin"></span> Enviando para a Meta…';
+  try {
+    const data = await api('/api/templates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r)
+    });
+    const chave = `${data.name}|${data.language}`;
+    // O "{{1}} = Nome do cliente" fica guardado para o disparo sugerir a coluna da planilha.
+    const apelidos = armazenado.ler('disparo.apelidos', {});
+    apelidos[chave] = apelidosDoRascunho();
+    armazenado.gravar('disparo.apelidos', apelidos);
+    const criados = armazenado.ler('disparo.criados', {});
+    criados[chave] = data.status || 'PENDING';
+    armazenado.gravar('disparo.criados', criados);
+
+    await atualizarLista(true);
+    const aprovado = data.status === 'APPROVED';
+    $('cResult').innerHTML = `<div class="alert ${aprovado ? 'a-ok' : 'a-info'}" style="margin-top:12px">
+      <b>${aprovado ? '✅ Aprovado na hora!' : '⏳ Enviado — em análise pela Meta.'}</b>
+      <span class="mono">${esc(data.name)}</span> ${aprovado ? 'já pode ser usado.' :
+        'A resposta costuma sair em minutos. Esta tela confere sozinha e avisa quando sair o resultado — pode continuar usando o sistema.'}
+      ${aprovado ? `<div style="margin-top:6px"><a href="#" id="cUsarAgora">Usar no disparo →</a></div>` : ''}</div>`;
+    const usar = $('cUsarAgora');
+    if (usar) usar.addEventListener('click', ev => { ev.preventDefault(); usarNoDisparo(data.name, data.language); });
+  } catch (e) {
+    $('cResult').innerHTML = `<div class="alert a-err" style="margin-top:12px"><b>A Meta recusou:</b> ${esc(e.message)}</div>`;
+  } finally {
+    criar.enviando = false;
+    botao.textContent = 'Enviar para a Meta aprovar';
+    renderNomeHint();
+    renderChecklist();
+  }
+});
+
+// ------------------------------------------------------------- cópia
+function carregarNoEditor({ header = '', body = '', footer = '', buttons = [], examples = {}, descricoes = {},
+                            category = '', language = 'pt_BR' }) {
+  $('cHeader').value = header;
+  $('cBody').value = body;
+  $('cFooter').value = footer;
+  $('cLang').value = language;
+  criar.examples = { ...examples };
+  criar.descricoes = { ...descricoes };
+  criar.buttons = [];
+  buttons.forEach(b => adicionarBotao(b.type, b.text, b));
+  criar.varsChave = null;
+  criar.nameAuto = true;
+  if (category) marcarCategoria(category);
+  renderBotoesEditor();
+  aoMudar();
+}
+
+function temConteudo() {
+  return $('cHeader').value.trim() || $('cBody').value.trim() || $('cFooter').value.trim() || criar.buttons.length;
+}
+
+// Traz um template da conta para o editor, com os exemplos que a Meta guardou e, quando ele
+// foi criado por aqui, a descrição de cada {{n}}.
+function duplicar(t) {
+  if (temConteudo() && !confirm(`Substituir o que está escrito pelo conteúdo de "${t.name}"?`)) return;
+  const apelidos = armazenado.ler('disparo.apelidos', {})[`${t.name}|${t.language}`] || {};
+  const examples = {}, descricoes = {};
+  (t.header.example || []).forEach((valor, i) => { examples[`header:${i + 1}`] = valor; });
+  (t.body.example || []).forEach((valor, i) => { examples[`body:${i + 1}`] = valor; });
+  // Apelidos antigos podiam ser nomes como "nome": continuam valendo como descrição.
+  Object.entries(apelidos).forEach(([k, v]) => { if (/^(header|body):/.test(k)) descricoes[k] = v; });
+
+  const botoes = [];
+  (t.buttons || []).forEach(b => {
+    if (b.type === 'QUICK_REPLY') botoes.push({ type: b.type, text: b.text });
+    else if (b.type === 'PHONE_NUMBER') botoes.push({ type: b.type, text: b.text, phone: b.phone_number || '' });
+    else if (b.type === 'URL') {
+      const base = (b.url || '').replace(VAR_RE, '');
+      botoes.push({ type: b.type, text: b.text, url: b.url || '',
+        example: b.example ? b.example.slice(base.length) : '', descricao: apelidos[`button:${b.index}:1`] || '' });
+    }
+  });
+
+  carregarNoEditor({
+    header: t.header.format === 'TEXT' ? t.header.text : '',
+    body: t.body.text, footer: t.footer || '', buttons: botoes, examples, descricoes,
+    category: ['MARKETING', 'UTILITY'].includes(t.category) ? t.category : '', language: t.language
+  });
+  if (!['NONE', 'TEXT'].includes(t.header.format)) {
+    toast(`O cabeçalho de ${esc(t.header.format.toLowerCase())} de <b>${esc(t.name)}</b> não foi copiado: por aqui dá para criar só cabeçalho de texto.`);
+  }
+  $('cBody').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ------------------------------------------------- acompanhar aprovação
+async function atualizarLista(silencioso) {
+  if (!silencioso && !criar.listaCarregada) $('cList').innerHTML = '<div class="muted" style="font-size:13px">Carregando…</div>';
+  try {
+    const data = await api('/api/templates?ordem=recentes');
+    criar.lista = data.templates;
+    criar.listaCarregada = true;
+    // Com a lista em mãos, o nome automático já desvia dos que existem na conta.
+    if (criar.nameAuto) $('cName').value = gerarNome();
+    verificarMudancas();
+    renderLista();
+    renderNomeHint();
+    renderChecklist();
+  } catch (e) {
+    if (!silencioso) $('cList').innerHTML = `<div class="alert a-err">${esc(e.message)}</div>`;
+  }
+}
+
+function renderLista() {
+  const termo = $('cListSearch').value.trim().toLowerCase();
+  const criados = armazenado.ler('disparo.criados', {});
+  const itens = criar.lista.filter(t => !termo || t.name.includes(termo)).slice(0, termo ? 50 : 15);
+  const ativos = criar.lista.filter(t => !['DELETED', 'PENDING_DELETION'].includes(t.status)).length;
+  const emAnalise = criar.lista.filter(t => t.status === 'PENDING').length;
+  $('cListInfo').innerHTML = `${ativos} templates na conta` + (emAnalise ? ` · ${emAnalise} em análise` : '') +
+    (ativos >= LIMITE_TEMPLATES - 20 ? ` · <span class="bad-text">perto do limite de ${LIMITE_TEMPLATES} de contas não verificadas — vale excluir os antigos no WhatsApp Manager</span>` : '');
+
+  $('cList').innerHTML = itens.map(t => {
+    const [rotulo, classe] = STATUS_TPL[t.status] || [t.status, 'b-mute'];
+    const motivo = t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE'
+      ? `<div class="motivo">Motivo: ${esc(MOTIVO_REJEICAO[t.rejected_reason] || t.rejected_reason)}</div>` : '';
+    const indice = criar.lista.indexOf(t);
+    return `<div class="tplrow">
+      <div><div class="nome mono">${criados[`${t.name}|${t.language}`] ? '<span title="criado por aqui" style="color:var(--marca-rosa)">★</span> ' : ''}${esc(t.name)}</div>
+        <div class="muted" style="font-size:12px">${esc(t.language)} · ${esc((t.category || '—').toLowerCase())}</div>${motivo}</div>
+      <div style="text-align:right;white-space:nowrap"><span class="badge ${classe}">${esc(rotulo)}</span>
+        <div class="acoes">${t.status === 'APPROVED' ? `<a href="#" data-usar="${indice}">usar</a>` : ''}<a href="#" data-dup="${indice}">duplicar</a></div></div>
+    </div>`;
+  }).join('') || '<div class="muted" style="font-size:13px">Nenhum template encontrado.</div>';
+
+  $('cList').querySelectorAll('[data-usar]').forEach(a => a.addEventListener('click', ev => {
+    ev.preventDefault();
+    const t = criar.lista[Number(a.dataset.usar)];
+    usarNoDisparo(t.name, t.language);
+  }));
+  $('cList').querySelectorAll('[data-dup]').forEach(a => a.addEventListener('click', ev => {
+    ev.preventDefault();
+    duplicar(criar.lista[Number(a.dataset.dup)]);
+  }));
+}
+
+// O vigia de status: compara o que a Meta diz agora com o último status visto dos
+// templates criados por aqui, e avisa o que mudou (também ao reabrir a página).
+function verificarMudancas() {
+  const criados = armazenado.ler('disparo.criados', {});
+  let mudou = false;
+  for (const t of criar.lista) {
+    const chave = `${t.name}|${t.language}`;
+    if (!(chave in criados) || criados[chave] === t.status) continue;
+    criados[chave] = t.status;
+    mudou = true;
+    const [rotulo] = STATUS_TPL[t.status] || [t.status];
+    const motivo = t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE'
+      ? `<div style="margin-top:4px">Motivo: ${esc(MOTIVO_REJEICAO[t.rejected_reason] || t.rejected_reason)}. Use <b>duplicar</b> para corrigir e reenviar com outro nome.</div>` : '';
+    const acao = t.status === 'APPROVED'
+      ? `<div style="margin-top:6px"><a href="#" data-toast-usar="${esc(chave)}">Usar no disparo →</a></div>` : '';
+    toast(`${t.status === 'APPROVED' ? '✅' : t.status === 'REJECTED' ? '❌' : 'ℹ️'} <b class="mono">${esc(t.name)}</b> — ${esc(rotulo.toLowerCase())}${motivo}${acao}`,
+      t.status === 'APPROVED' ? 'ok' : t.status === 'REJECTED' ? 'err' : '');
+    if (criar.view !== 'criar') $('navCriar').classList.add('novidade');
+  }
+  if (mudou) armazenado.gravar('disparo.criados', criados);
+}
+
+function temPendenteAcompanhado() {
+  return Object.values(armazenado.ler('disparo.criados', {})).some(s => ['PENDING', 'IN_APPEAL'].includes(s));
+}
+
+function toast(html, tipo = '') {
+  const el = document.createElement('div');
+  el.className = `toast ${tipo}`;
+  el.innerHTML = `${html}<button class="fechar" title="Fechar">×</button>`;
+  el.querySelector('.fechar').addEventListener('click', () => el.remove());
+  const usar = el.querySelector('[data-toast-usar]');
+  if (usar) usar.addEventListener('click', ev => {
+    ev.preventDefault();
+    const [nome, idioma] = usar.dataset.toastUsar.split('|');
+    usarNoDisparo(nome, idioma);
+    el.remove();
+  });
+  $('toasts').appendChild(el);
+}
+
+async function usarNoDisparo(nome, idioma) {
+  trocarView('disparo');
+  $('tplSearch').value = nome;
+  await loadTemplates();
+  const indice = state.templates.findIndex(t => t.name === nome && t.language === idioma);
+  if (indice >= 0) {
+    $('tplSelect').value = String(indice);
+    selectTemplate();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// --------------------------------------------------------------- telas
+function trocarView(view) {
+  criar.view = view;
+  $('viewDisparo').classList.toggle('hidden', view !== 'disparo');
+  $('viewCriar').classList.toggle('hidden', view !== 'criar');
+  $('viewRemover').classList.toggle('hidden', view !== 'remover');
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  history.replaceState(null, '', view === 'disparo' ? location.pathname : '#' + view);
+  if (view === 'criar') {
+    $('navCriar').classList.remove('novidade');
+    if (!criar.listaCarregada) atualizarLista();
+    autoAltura($('cBody'));
+  } else if (view === 'remover' && !remover.carregado) {
+    carregarRemocao();
+  }
+}
+
+document.querySelectorAll('.view-btn').forEach(b => b.addEventListener('click', () => trocarView(b.dataset.view)));
+
+// ------------------------------------------------------------- eventos
+['cHeader', 'cBody', 'cFooter'].forEach(id => $(id).addEventListener('input', aoMudar));
+$('cHeader').addEventListener('focus', () => { criar.foco = $('cHeader'); });
+$('cBody').addEventListener('focus', () => { criar.foco = $('cBody'); });
+$('cFooter').addEventListener('focus', () => { criar.foco = null; });  // rodapé não aceita variável
+$('cLang').addEventListener('change', aoMudar);
+
+$('cName').addEventListener('input', () => {
+  const el = $('cName');
+  el.value = semAcento(el.value).toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+  criar.nameAuto = !el.value;  // apagou tudo: volta a gerar pelo texto
+  aoMudar();
+});
+$('cNameAuto').addEventListener('click', () => { criar.nameAuto = true; aoMudar(); });
+document.querySelectorAll('input[name=cCat]').forEach(r => r.addEventListener('change', aoMudar));
+
+document.querySelectorAll('[data-fmt]').forEach(btn => btn.addEventListener('click', () =>
+  inserir($('cBody'), btn.dataset.fmt, btn.dataset.fmt)));
+document.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => {
+  adicionarBotao(btn.dataset.add);
+  renderBotoesEditor();
+  aoMudar();
+  const campos = $('cButtons').querySelectorAll('.ebtn:last-child input');
+  if (campos.length) campos[0].focus();
+}));
+
+$('emojiPop').innerHTML = EMOJIS.map(e => `<button data-emoji="${e}">${e}</button>`).join('');
+$('emojiPop').querySelectorAll('[data-emoji]').forEach(b => b.addEventListener('click', () => {
+  inserir($('cBody'), b.dataset.emoji);
+  $('emojiPop').classList.add('hidden');
+}));
+
+// O "+ Variável" já sabe o próximo número do campo em que o cursor está. Se ela entrar no meio
+// do texto, a renumeração do aoMudar reordena as outras e leva a descrição junto.
+function renderVarPop() {
+  const alvo = alvoDaVariavel();
+  const secao = secaoDoCampo(alvo);
+  const proximo = varsDe(alvo.value).length + 1;
+  const onde = secao === 'header' ? 'no título' : secao === 'body' ? 'na mensagem' : 'no final do link';
+
+  const cheio = secao === 'header' ? proximo > 1 && 'O título aceita só 1 variável.'
+    : secao.startsWith('btn:') ? proximo > 1 && 'O link aceita só 1 variável, no final.' : false;
+  if (cheio) {
+    $('varPop').innerHTML = `<div class="poptit">${esc(cheio)}</div>
+      <div class="hint">Clique na mensagem para inserir a variável lá.</div>`;
+    return;
+  }
+
+  $('varPop').innerHTML = `<div class="poptit">Inserir <code>{{${proximo}}}</code> ${onde}</div>
+    <div class="hint" style="margin:0 0 6px">O que ela representa? Opcional — ajuda a ligar a coluna certa no disparo.</div>` +
+    DESCRICOES_SUGERIDAS.map(d => `<button class="vopt" data-desc-var="${esc(d)}"><span>${esc(d)}</span><code>{{${proximo}}}</code></button>`).join('') +
+    `<button class="vopt" data-desc-var=""><span class="muted">Sem descrição</span><code>{{${proximo}}}</code></button>
+    <div class="row" style="margin-top:8px;gap:6px">
+      <input type="text" id="varNova" placeholder="Outra descrição" style="min-width:0">
+      <button class="btn" id="varNovaBtn" style="flex:0 0 auto;min-width:auto;padding:8px 12px">OK</button></div>`;
+
+  const inserirVar = descricao => {
+    $('varPop').classList.add('hidden');
+    // A descrição entra sob o número novo; a renumeração a leva para a posição final.
+    if (descricao.trim()) criar.descricoes[`${secao}:${proximo}`] = descricao.trim();
+    if (secao.startsWith('btn:')) alvo.setSelectionRange(alvo.value.length, alvo.value.length);  // no link, sempre no fim
+    inserir(alvo, `{{${proximo}}}`);
+  };
+  $('varPop').querySelectorAll('[data-desc-var]').forEach(b => b.addEventListener('click', () => inserirVar(b.dataset.descVar)));
+  $('varNovaBtn').addEventListener('click', () => inserirVar($('varNova').value));
+  $('varNova').addEventListener('keydown', ev => { if (ev.key === 'Enter') inserirVar($('varNova').value); });
+}
+
+// mousedown em vez de click: o botão não rouba o foco do campo onde a variável vai entrar.
+$('varBtn').addEventListener('mousedown', ev => ev.preventDefault());
+$('varBtn').addEventListener('click', () => {
+  renderVarPop();
+  $('emojiPop').classList.add('hidden');
+  $('varPop').classList.toggle('hidden');
+});
+$('emojiBtn').addEventListener('mousedown', ev => ev.preventDefault());
+$('emojiBtn').addEventListener('click', () => {
+  $('varPop').classList.add('hidden');
+  $('emojiPop').classList.toggle('hidden');
+});
+document.addEventListener('click', ev => {
+  if (!ev.target.closest('.pop')) document.querySelectorAll('.popover').forEach(p => p.classList.add('hidden'));
+});
+
+$('cClear').addEventListener('click', () => {
+  if (temConteudo() && !confirm('Apagar tudo o que está escrito?')) return;
+  carregarNoEditor({ category: CATEGORIA_PADRAO });
+  $('cBody').focus();
+});
+$('cListSearch').addEventListener('input', renderLista);
+$('cListReload').addEventListener('click', () => atualizarLista());
+
+function iniciarCriacao() {
+  // Rascunho de versões anteriores da tela: a criação agora começa sempre em branco.
+  try { localStorage.removeItem('disparo.rascunho'); } catch (e) { /* sem storage */ }
+  renderBotoesEditor();
+  aoMudar();
+  // Confere logo ao abrir: o que a Meta decidiu com a página fechada vira aviso agora.
+  if (temPendenteAcompanhado()) atualizarLista(true);
+  if (location.hash === '#criar' || location.hash === '#remover') trocarView(location.hash.slice(1));
+}
+
+// ======================================================== remover templates
+// Limpeza da conta perto do limite de 250. A pessoa protege o que fica (🔒 Manter) e
+// seleciona o que sai; nada vai para a Meta antes da confirmação digitada. As proteções
+// ficam neste navegador; templates numa campanha em andamento são travados pelo sistema.
+
+const remover = {
+  lista: [], uso: {}, carregado: false, filtro: 'todos', abertos: new Set(), parar: false, rodando: false,
+  manter: new Set(armazenado.ler('disparo.manter', [])), apagar: new Set()
+};
+
+const chaveTpl = t => `${t.name}|${t.language}`;
+const usoDe = t => remover.uso[chaveTpl(t)] || null;
+const emDisparo = t => !!(usoDe(t) || {}).ativa;
+const protegido = t => remover.manter.has(chaveTpl(t)) || emDisparo(t);
+const excluindo = t => t.status === 'PENDING_DELETION';
+const selecionavel = t => !protegido(t) && !excluindo(t);
+
+// Os nomes da conta terminam em _dia_mês_ano (às vezes com _2): é a melhor pista de idade.
+function dataDoNome(nome) {
+  const m = nome.match(/_(\d{1,2})_(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)_(\d{4})(?:_\d+)?$/);
+  if (!m) return null;
+  return new Date(Number(m[3]), MESES.indexOf(m[2]), Number(m[1]));
+}
+
+const dataCurta = d => d ? d.toLocaleDateString('pt-BR') : '';
+function diasAtras(iso) {
+  const dias = Math.floor((Date.now() - new Date(iso)) / 864e5);
+  return dias <= 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias`;
+}
+
+const FILTROS_REMOCAO = [
+  ['todos', 'Todos', () => true],
+  ['aprovados', 'Aprovados', t => t.status === 'APPROVED'],
+  ['semuso', 'Nunca disparados aqui', t => !(usoDe(t) || {}).campanhas],
+  ['rejeitados', 'Rejeitados', t => t.status === 'REJECTED'],
+  ['parados', 'Pausados / desativados', t => ['PAUSED', 'DISABLED', 'LIMIT_EXCEEDED'].includes(t.status)],
+  ['analise', 'Em análise', t => ['PENDING', 'IN_APPEAL'].includes(t.status)],
+  ['protegidos', '🔒 Protegidos', t => protegido(t)],
+  ['selecionados', '🗑 Selecionados', t => remover.apagar.has(chaveTpl(t))]
+];
+
+const ORDENS_REMOCAO = {
+  antigos: (a, b) => b.ordem - a.ordem,
+  recentes: (a, b) => a.ordem - b.ordem,
+  nome: (a, b) => a.name.localeCompare(b.name),
+  // Nunca disparados primeiro, depois do disparo mais antigo para o mais recente.
+  uso: (a, b) => ((usoDe(a) || {}).ultimo || '').localeCompare((usoDe(b) || {}).ultimo || '') || b.ordem - a.ordem
+};
+
+async function carregarRemocao() {
+  $('rList').innerHTML = '<div class="muted" style="padding:14px;font-size:13px">Carregando templates da Meta…</div>';
+  try {
+    const [templates, uso] = await Promise.all([
+      api('/api/templates?ordem=recentes'),
+      api('/api/templates/usage').catch(() => ({ usage: {} }))  // sem histórico, a tela funciona sem "último disparo"
+    ]);
+    remover.lista = templates.templates
+      .filter(t => t.status !== 'DELETED')
+      .map((t, i) => ({ ...t, ordem: i, data: dataDoNome(t.name) }));
+    remover.uso = uso.usage || {};
+    // Seleção de um template que não existe mais (apagado por fora) não vale.
+    const existentes = new Set(remover.lista.map(chaveTpl));
+    remover.apagar = new Set([...remover.apagar].filter(k => existentes.has(k)));
+    remover.carregado = true;
+    renderRemocao();
+  } catch (e) {
+    $('rList').innerHTML = `<div class="alert a-err">${esc(e.message)}</div>`;
+  }
+}
+
+function visiveisRemocao() {
+  const termo = $('rBusca').value.trim().toLowerCase();
+  const [, , filtro] = FILTROS_REMOCAO.find(([id]) => id === remover.filtro) || FILTROS_REMOCAO[0];
+  return remover.lista
+    .filter(t => filtro(t) && (!termo || t.name.includes(termo)))
+    .sort(ORDENS_REMOCAO[$('rOrdem').value]);
+}
+
+function renderRemocao() {
+  renderResumoRemocao();
+
+  $('rFiltros').innerHTML = FILTROS_REMOCAO.map(([id, rotulo, filtro]) =>
+    `<button class="chip${remover.filtro === id ? ' active' : ''}" data-filtro="${id}">${rotulo}<b>${remover.lista.filter(filtro).length}</b></button>`
+  ).join('');
+
+  const visiveis = visiveisRemocao();
+  const resto = visiveis.filter(t => selecionavel(t) && !remover.apagar.has(chaveTpl(t)));
+  const inuteis = remover.lista.filter(t => ['REJECTED', 'PAUSED', 'DISABLED'].includes(t.status) &&
+    selecionavel(t) && !remover.apagar.has(chaveTpl(t)));
+  const recentes = remover.lista.filter(t => {
+    const u = usoDe(t);
+    return u && u.ultimo && (Date.now() - new Date(u.ultimo)) < 30 * 864e5 && !protegido(t);
+  });
+  const filtrando = remover.filtro !== 'todos' || $('rBusca').value.trim();
+  $('rAcoes').innerHTML = `
+    <button class="btn-danger-ghost" data-rapido="resto" ${resto.length ? '' : 'disabled'}
+      title="Seleciona para apagar todos ${filtrando ? 'desta lista filtrada' : 'os templates'} que não estão protegidos">
+      🗑 Selecionar todo o resto${filtrando ? ' desta lista' : ''} (${resto.length})</button>
+    <button class="btn-danger-ghost" data-rapido="inuteis" ${inuteis.length ? '' : 'disabled'}
+      title="Rejeitados, pausados e desativados não podem ser disparados">🗑 Selecionar rejeitados e pausados (${inuteis.length})</button>
+    <button class="btn-ok-ghost" data-rapido="recentes" ${recentes.length ? '' : 'disabled'}
+      title="Protege os que tiveram disparo pelo DisparoMais nos últimos 30 dias">🔒 Proteger disparados nos últimos 30 dias (${recentes.length})</button>
+    <button class="btn-ghost" data-rapido="limpar" ${remover.apagar.size ? '' : 'disabled'}>Limpar seleção</button>`;
+
+  $('rList').innerHTML = visiveis.map(linhaRemocao).join('') ||
+    '<div class="muted" style="padding:14px;font-size:13px">Nenhum template neste filtro.</div>';
+  renderBarraRemocao();
+}
+
+function linhaRemocao(t) {
+  const k = chaveTpl(t), u = usoDe(t);
+  const prot = protegido(t), trav = emDisparo(t) || excluindo(t), sel = remover.apagar.has(k);
+  const [rotulo, classe] = STATUS_TPL[t.status] || [t.status, 'b-mute'];
+  const classes = ['rrow', sel && 'sel', prot && 'prot', excluindo(t) && 'trav'].filter(Boolean).join(' ');
+  const lock = emDisparo(t)
+    ? '<button class="lock on" disabled title="Numa campanha em andamento: não pode ser apagado agora">🔒 Em disparo</button>'
+    : `<button class="lock${prot ? ' on' : ''}" data-acao="manter" title="${prot ? 'Tirar a proteção' : 'Proteger: este template não pode ser selecionado para apagar'}">${prot ? '🔒 Manter' : 'Manter'}</button>`;
+  const texto = remover.abertos.has(k) ? `<div class="rtexto">` +
+    (t.header && t.header.format === 'TEXT' && t.header.text ? `<div class="hd">${esc(t.header.text)}</div>` : '') +
+    (t.header && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(t.header.format) ? `<div class="muted">[${esc(t.header.format.toLowerCase())} no cabeçalho]</div>` : '') +
+    esc(t.body.text || '') + (t.footer ? `<div class="ft">${esc(t.footer)}</div>` : '') + '</div>' : '';
+  return `<div class="${classes}" data-k="${esc(k)}">
+    <input type="checkbox" data-acao="apagar" ${sel ? 'checked' : ''} ${selecionavel(t) ? '' : 'disabled'} title="Selecionar para apagar">
+    ${lock}
+    <div><div class="nome mono">${esc(t.name)}</div>
+      <div class="rmeta"><span class="badge ${classe}">${esc(rotulo)}</span>
+        <span class="badge b-mute">${esc((t.category || '—').toLowerCase())}</span><span class="badge b-mute">${esc(t.language)}</span>
+        ${t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE' ? `<span class="badge b-err">${esc(MOTIVO_REJEICAO[t.rejected_reason] || t.rejected_reason)}</span>` : ''}</div></div>
+    <div class="rdata">${t.data ? dataCurta(t.data) : '<span class="muted">—</span>'}</div>
+    <div class="ruso">${u && u.ultimo
+      ? `${esc(dataCurta(new Date(u.ultimo)))} <span class="muted">(${diasAtras(u.ultimo)})</span><span class="sub">${u.campanhas} disparo${u.campanhas === 1 ? '' : 's'} · ${u.enviadas.toLocaleString('pt-BR')} msgs</span>`
+      : '<span class="muted">nunca por aqui</span>'}</div>
+    <button class="rver" data-acao="ver">${remover.abertos.has(k) ? 'fechar' : 'ver texto'}</button>
+    ${texto}
+  </div>`;
+}
+
+function renderResumoRemocao() {
+  const ativos = remover.lista.filter(t => !excluindo(t)).length;
+  const sai = remover.lista.filter(t => remover.apagar.has(chaveTpl(t)) && selecionavel(t)).length;
+  const prot = remover.lista.filter(protegido).length;
+  const fica = ativos - sai;
+  const pct = n => Math.min(100, n / LIMITE_TEMPLATES * 100);
+  $('rStats').innerHTML = `
+    <div class="stat"><b style="color:${ativos >= LIMITE_TEMPLATES - 20 ? 'var(--danger)' : 'var(--ink)'}">${ativos}/${LIMITE_TEMPLATES}</b><span>na conta hoje</span></div>
+    <div class="stat"><b style="color:var(--ok)">${prot}</b><span>protegidos</span></div>
+    <div class="stat"><b style="color:var(--danger)">${sai}</b><span>para apagar</span></div>
+    <div class="stat"><b>${fica}</b><span>ficam depois</span></div>
+    <div class="stat"><b style="color:var(--ok)">${LIMITE_TEMPLATES - fica}</b><span>vagas depois</span></div>`;
+  $('rCap').innerHTML = `<div class="fica" style="width:${pct(fica)}%"></div><div class="sai" style="width:${pct(sai)}%"></div>`;
+  $('rCapLeg').innerHTML = `<span><i style="background:var(--brand)"></i>ficam (${fica})</span>
+    <span><i style="background:#e24b3f"></i>saem (${sai})</span>
+    <span><i style="background:#e9edef"></i>livres depois (${LIMITE_TEMPLATES - fica})</span>
+    <span>Limite de ${LIMITE_TEMPLATES} para contas não verificadas.</span>`;
+}
+
+function renderBarraRemocao() {
+  const alvos = remover.lista.filter(t => remover.apagar.has(chaveTpl(t)) && selecionavel(t));
+  const ativos = remover.lista.filter(t => !excluindo(t)).length;
+  $('rBar').innerHTML = alvos.length
+    ? `<div class="txt"><b>${alvos.length} template${alvos.length === 1 ? '' : 's'}</b> selecionado${alvos.length === 1 ? '' : 's'} para apagar —
+         a conta fica com <b>${ativos - alvos.length}</b> de ${LIMITE_TEMPLATES}.</div>
+       <button class="btn-ghost" data-rapido="limpar">Limpar seleção</button>
+       <button class="btn-danger" id="rRevisar">Revisar e apagar ${alvos.length}</button>`
+    : `<div class="txt muted">Nenhum template selecionado. Proteja o que fica e use <b>Selecionar todo o resto</b>, ou marque um a um.</div>`;
+  const revisar = $('rRevisar');
+  if (revisar) revisar.addEventListener('click', abrirConfirmacaoRemocao);
+}
+
+function salvarProtecoes() { armazenado.gravar('disparo.manter', [...remover.manter]); }
+
+// ------------------------------------------------------------- interação
+$('rList').addEventListener('click', ev => {
+  const linha = ev.target.closest('.rrow');
+  if (!linha || ev.target.closest('.rtexto')) return;
+  const k = linha.dataset.k;
+  const t = remover.lista.find(x => chaveTpl(x) === k);
+  if (!t) return;
+  const acao = (ev.target.closest('[data-acao]') || {}).dataset?.acao;
+  if (acao === 'manter') {
+    if (remover.manter.has(k)) remover.manter.delete(k);
+    else { remover.manter.add(k); remover.apagar.delete(k); }
+    salvarProtecoes();
+  } else if (acao === 'ver') {
+    remover.abertos.has(k) ? remover.abertos.delete(k) : remover.abertos.add(k);
+  } else if (selecionavel(t)) {
+    // Clique na linha ou no checkbox: alterna a seleção para apagar.
+    remover.apagar.has(k) ? remover.apagar.delete(k) : remover.apagar.add(k);
+  }
+  renderRemocao();
+});
+
+$('rFiltros').addEventListener('click', ev => {
+  const chip = ev.target.closest('[data-filtro]');
+  if (!chip) return;
+  remover.filtro = chip.dataset.filtro;
+  renderRemocao();
+});
+
+document.addEventListener('click', ev => {
+  const botao = ev.target.closest('[data-rapido]');
+  if (!botao || !$('viewRemover').contains(botao)) return;
+  const tipo = botao.dataset.rapido;
+  if (tipo === 'resto') {
+    visiveisRemocao().filter(selecionavel).forEach(t => remover.apagar.add(chaveTpl(t)));
+  } else if (tipo === 'inuteis') {
+    remover.lista.filter(t => ['REJECTED', 'PAUSED', 'DISABLED'].includes(t.status) && selecionavel(t))
+      .forEach(t => remover.apagar.add(chaveTpl(t)));
+  } else if (tipo === 'recentes') {
+    remover.lista.filter(t => { const u = usoDe(t); return u && u.ultimo && (Date.now() - new Date(u.ultimo)) < 30 * 864e5; })
+      .forEach(t => { remover.manter.add(chaveTpl(t)); remover.apagar.delete(chaveTpl(t)); });
+    salvarProtecoes();
+  } else if (tipo === 'limpar') {
+    remover.apagar.clear();
+  }
+  renderRemocao();
+});
+
+$('rBusca').addEventListener('input', renderRemocao);
+$('rOrdem').addEventListener('change', renderRemocao);
+$('rRecarregar').addEventListener('click', carregarRemocao);
+
+// ---------------------------------------------------------- confirmação
+function abrirConfirmacaoRemocao() {
+  const alvos = remover.lista.filter(t => remover.apagar.has(chaveTpl(t)) && selecionavel(t));
+  if (!alvos.length) return;
+  const usados = alvos.filter(t => (usoDe(t) || {}).campanhas).length;
+  $('rModalBox').innerHTML = `
+    <h3>Apagar ${alvos.length} template${alvos.length === 1 ? '' : 's'}?</h3>
+    <div class="alert a-err"><b>Não dá para desfazer.</b> O template some da conta da Meta, disparos futuros com ele falham
+      e o mesmo nome fica bloqueado por algumas semanas para ser criado de novo.</div>
+    ${usados ? `<div class="alert a-warn">${usados} dos selecionados já foram disparados pelo DisparoMais. O histórico dessas campanhas continua, só o template deixa de existir.</div>` : ''}
+    <div class="scroll" style="max-height:220px"><ul>${alvos.map(t => `<li class="mono">${esc(t.name)} <span class="muted">· ${esc(t.language)}</span></li>`).join('')}</ul></div>
+    <label>Para confirmar, digite <b>APAGAR</b></label>
+    <input type="text" id="rConfirma" autocomplete="off" placeholder="APAGAR">
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn-ghost" id="rCancelar" style="flex:0 0 auto">Cancelar</button>
+      <button class="btn-danger" id="rConfirmar" style="flex:0 0 auto" disabled>Apagar ${alvos.length}</button>
+    </div>`;
+  $('rModal').classList.remove('hidden');
+  $('rConfirma').focus();
+  $('rConfirma').addEventListener('input', () => { $('rConfirmar').disabled = $('rConfirma').value.trim().toUpperCase() !== 'APAGAR'; });
+  $('rCancelar').addEventListener('click', fecharModalRemocao);
+  $('rConfirmar').addEventListener('click', () => executarRemocao(alvos));
+}
+
+function fecharModalRemocao() {
+  if (remover.rodando) return;  // durante a remoção, só pelo botão Parar
+  $('rModal').classList.add('hidden');
+}
+$('rModal').addEventListener('click', ev => { if (ev.target === $('rModal')) fecharModalRemocao(); });
+
+// Um template por requisição, em sequência: cada chamada é curta (cabe no limite da Vercel),
+// o progresso é real e dá para parar no meio. Três falhas seguidas indicam problema geral
+// (token, permissão) e interrompem em vez de insistir na lista inteira.
+async function executarRemocao(alvos) {
+  remover.rodando = true;
+  remover.parar = false;
+  let ok = 0, seguidas = 0;
+  const falhas = [];
+  $('rModalBox').innerHTML = `
+    <h3>Apagando templates…</h3>
+    <div id="rProgTxt" class="muted" style="font-size:13px"></div>
+    <div class="bar"><div id="rProgBar" style="width:0%;background:var(--danger)"></div></div>
+    <div id="rProgFalhas"></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn-ghost" id="rParar" style="flex:0 0 auto">Parar</button>
+    </div>`;
+  $('rParar').addEventListener('click', () => { remover.parar = true; $('rParar').disabled = true; $('rParar').textContent = 'Parando…'; });
+
+  for (const [i, t] of alvos.entries()) {
+    if (remover.parar) break;
+    $('rProgTxt').innerHTML = `${i + 1} de ${alvos.length}: <span class="mono">${esc(t.name)}</span>`;
+    try {
+      await api('/api/templates/delete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: t.name, id: t.id, language: t.language })
+      });
+      ok++;
+      seguidas = 0;
+      remover.apagar.delete(chaveTpl(t));
+      remover.manter.delete(chaveTpl(t));
+    } catch (e) {
+      falhas.push([t.name, e.message]);
+      if (++seguidas >= 3) { remover.parar = true; falhas.push(['—', 'Parei depois de 3 falhas seguidas: confira a mensagem acima (token ou permissão).']); }
+    }
+    $('rProgBar').style.width = `${Math.round((i + 1) / alvos.length * 100)}%`;
+    $('rProgFalhas').innerHTML = falhas.length ? `<div class="scroll" style="max-height:160px;margin-top:8px"><table>
+      <tr><th>Template</th><th>Erro</th></tr>${falhas.map(([n, m]) => `<tr><td class="mono">${esc(n)}</td><td>${esc(m)}</td></tr>`).join('')}</table></div>` : '';
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  remover.rodando = false;
+  salvarProtecoes();
+  const restantes = alvos.length - ok - falhas.filter(([n]) => n !== '—').length;
+  $('rProgTxt').innerHTML = `<b style="color:var(--ok)">${ok} apagado${ok === 1 ? '' : 's'}</b>` +
+    (falhas.length ? ` · <b style="color:var(--danger)">${falhas.filter(([n]) => n !== '—').length} com falha</b> (continuam selecionados)` : '') +
+    (restantes > 0 ? ` · ${restantes} não processado${restantes === 1 ? '' : 's'} (parou antes)` : '');
+  $('rParar').disabled = false;
+  $('rParar').textContent = 'Fechar';
+  $('rParar').onclick = fecharModalRemocao;
+  toast(`🗑 ${ok} template${ok === 1 ? '' : 's'} apagado${ok === 1 ? '' : 's'} da conta.`, falhas.length ? 'err' : 'ok');
+
+  // A conta mudou: recarrega esta tela, a lista de aprovação e a do disparo (se nada estiver escolhido lá).
+  await carregarRemocao();
+  criar.listaCarregada = false;
+  if (criar.view === 'criar') atualizarLista(true);
+  if (!state.template) loadTemplates();
+}
+
+// Enquanto houver template em análise, pergunta à Meta a cada minuto (5.000 chamadas/h de folga).
+setInterval(() => {
+  if (criar.view === 'criar' || temPendenteAcompanhado()) atualizarLista(true);
+}, 60 * 1000);
+
+iniciarCriacao();
 
 $('tplSelect').addEventListener('change', selectTemplate);
 $('tplSearch').addEventListener('input', renderTemplateOptions);

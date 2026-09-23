@@ -115,7 +115,9 @@ def _raise_for_error(response: requests.Response):
     except Exception:
         payload = {}
     code = payload.get("code")
-    message = payload.get("message") or response.text[:300] or "Erro desconhecido"
+    # error_user_msg é o motivo específico (ex.: "já existe um template com esse nome");
+    # `message` costuma ser genérico ("Invalid parameter").
+    message = payload.get("error_user_msg") or payload.get("message") or response.text[:300] or "Erro desconhecido"
     detail = payload.get("error_data", {}).get("details")
     if detail:
         message = f"{message} — {detail}"
@@ -181,17 +183,20 @@ def _parse_template(raw: Dict) -> Dict:
 
     for component in raw.get("components", []):
         tipo = component.get("type", "").upper()
+        exemplo = component.get("example") or {}
         if tipo == "HEADER":
             formato = component.get("format", "TEXT").upper()
             header = {
                 "format": formato,
                 "text": component.get("text", ""),
                 "variables": _parse_placeholders(component.get("text", "")) if formato == "TEXT" else [],
+                "example": exemplo.get("header_text") or [],
             }
         elif tipo == "BODY":
             body = {
                 "text": component.get("text", ""),
                 "variables": _parse_placeholders(component.get("text", "")),
+                "example": (exemplo.get("body_text") or [[]])[0],
             }
         elif tipo == "FOOTER":
             footer = component.get("text", "")
@@ -204,6 +209,8 @@ def _parse_template(raw: Dict) -> Dict:
                         "type": botao.get("type", ""),
                         "text": botao.get("text", ""),
                         "url": url,
+                        "phone_number": botao.get("phone_number", ""),
+                        "example": (botao.get("example") or [""])[0],
                         "variables": _parse_placeholders(url),
                     }
                 )
@@ -231,6 +238,7 @@ def _parse_template(raw: Dict) -> Dict:
         "status": raw.get("status"),
         "category": raw.get("category"),
         "quality": (raw.get("quality_score") or {}).get("score"),
+        "rejected_reason": raw.get("rejected_reason"),
         "header": header,
         "body": body,
         "footer": footer,
@@ -241,8 +249,12 @@ def _parse_template(raw: Dict) -> Dict:
     }
 
 
-def list_templates() -> List[Dict]:
-    """Lista todos os templates da WABA, paginando até o fim."""
+def list_templates(aprovados_primeiro: bool = True) -> List[Dict]:
+    """Lista todos os templates da WABA, paginando até o fim.
+
+    Por padrão os aprovados vêm antes (é o que o disparo usa); sem isso a ordem é a da
+    Meta, do mais recente para o mais antigo — a que interessa para acompanhar aprovação.
+    """
     if not settings.waba_id:
         raise MetaApiError(
             "WHATSAPP_WABA_ID não configurado.",
@@ -251,7 +263,7 @@ def list_templates() -> List[Dict]:
 
     templates = []
     url = f"{_base()}/{settings.waba_id}/message_templates"
-    params = {"limit": 100, "fields": "id,name,language,status,category,components,quality_score"}
+    params = {"limit": 100, "fields": "id,name,language,status,category,components,quality_score,rejected_reason"}
 
     while url:
         response = SESSION.get(url, headers=_headers(), params=params, timeout=30)
@@ -261,9 +273,49 @@ def list_templates() -> List[Dict]:
         url = (payload.get("paging") or {}).get("next")
         params = None  # a URL de paginação já vem com os parâmetros embutidos
 
+    if not aprovados_primeiro:
+        return templates
     # A Meta devolve do mais recente para o mais antigo; o sort estável preserva essa ordem
     # dentro de cada grupo, deixando os templates novos no topo.
     return sorted(templates, key=lambda t: t["status"] != "APPROVED")
+
+
+def create_template(payload: Dict) -> Dict:
+    """Envia um template novo para análise da Meta. Devolve id, status e categoria."""
+    if not settings.waba_id:
+        raise MetaApiError(
+            "WHATSAPP_WABA_ID não configurado.",
+            hint="Pegue o ID da conta em business.facebook.com → WhatsApp Manager → Configurações da conta.",
+        )
+    response = SESSION.post(
+        f"{_base()}/{settings.waba_id}/message_templates",
+        headers={**_headers(), "Content-Type": "application/json"},
+        json=payload,
+        timeout=30,
+    )
+    _raise_for_error(response)
+    data = response.json()
+    return {"id": data.get("id"), "status": data.get("status", "PENDING"), "category": data.get("category")}
+
+
+def delete_template(name: str, template_id: str = "") -> None:
+    """Apaga um template da WABA. Irreversível.
+
+    Com o id (hsm_id) sai só aquela versão de idioma; só com o nome, a Meta apaga o template
+    em todos os idiomas. O nome fica bloqueado para recriação por algumas semanas.
+    """
+    if not settings.waba_id:
+        raise MetaApiError("WHATSAPP_WABA_ID não configurado.")
+    params = {"name": name}
+    if template_id:
+        params["hsm_id"] = template_id
+    response = SESSION.delete(
+        f"{_base()}/{settings.waba_id}/message_templates",
+        headers=_headers(),
+        params=params,
+        timeout=30,
+    )
+    _raise_for_error(response)
 
 
 # --------------------------------------------------------------------- mídia

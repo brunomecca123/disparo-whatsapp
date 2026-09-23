@@ -139,6 +139,16 @@ def listar_campanhas(limite: int = 30) -> List[Dict]:
     return _linhas(resposta)
 
 
+def uso_de_templates() -> List[Dict]:
+    """Uma linha por campanha, só com o necessário para saber quando cada template foi usado."""
+    resposta = _pedir(
+        "GET",
+        "/campaigns?select=nome:template->>name,idioma:template->>language,status,dry_run,sent,created_at"
+        "&order=created_at.desc&limit=10000",
+    )
+    return _linhas(resposta)
+
+
 def campanhas_por_status(status: List[str]) -> List[Dict]:
     lista = ",".join(status)
     resposta = _pedir("GET", f"/campaigns?status=in.({lista})&select=id,status")

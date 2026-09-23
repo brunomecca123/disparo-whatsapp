@@ -15,6 +15,45 @@ O script antigo continua funcionando sem alteração. O recomendado para o dia a
 ---
 
 
+## ✍️ Criar template
+
+A aba **Criar template** (no topo do app) envia templates novos direto para a Meta pela Graph API,
+sem passar pelo WhatsApp Manager.
+
+- **Editor em balão** — escreva como se fosse mandar pelo WhatsApp: título, mensagem, rodapé e botões
+  (resposta rápida, link, ligar). Negrito, itálico, emoji e variáveis pela barra de ferramentas.
+- **Variáveis numeradas** — o botão *+ Variável* insere o próximo número (`{{1}}`, `{{2}}`…, formato da Meta)
+  do campo onde está o cursor; inserir ou apagar no meio renumera tudo na ordem do texto, com o exemplo
+  acompanhando. Cada variável pode ter uma descrição opcional ("Nome do cliente"), que sugere o exemplo e,
+  no disparo, aparece como `{{1}} = Nome do cliente` e sugere a coluna da planilha.
+- **Tipo e nome** — o primeiro passo é escolher Marketing (padrão) ou Utilidade. O nome é gerado no padrão
+  `assunto_dia_mês_ano` a partir do texto (com `_2` se já existir); dá para editar ou gerar de novo.
+- **Validação ao vivo** — as regras da Meta (limites de tamanho, variável no início/fim do corpo, exemplo
+  faltando, nome repetido…) aparecem antes de enviar. A lógica fica em `core/template_builder.py`.
+- **Acompanhar aprovação** — a lista confere a Meta a cada minuto enquanto houver template em análise e
+  avisa na tela quando ele é aprovado ou rejeitado (com o motivo). *Usar* leva o template para o disparo,
+  onde as variáveis aparecem como `{{1}} = nome` e a coluna da planilha com o mesmo nome já vem sugerida.
+- **Duplicar** — traz qualquer template da conta de volta para o editor, útil para corrigir um rejeitado.
+
+Por enquanto só é possível criar cabeçalho de texto; cabeçalho de imagem/vídeo/documento continua pelo
+WhatsApp Manager. Contas não verificadas têm limite de 250 templates.
+
+## 🗑️ Remover templates
+
+A aba **Remover templates** limpa a conta quando ela se aproxima do limite de 250 templates.
+
+- **Proteger (🔒 Manter)** — marque o que precisa ficar; protegido não pode ser selecionado para apagar. Templates
+  numa campanha em andamento são travados automaticamente (e o servidor recusa apagá-los).
+- **Selecionar o que sai** — um a um (clique na linha), ou pelos atalhos: *Selecionar todo o resto* (tudo o que não
+  está protegido, respeitando o filtro/busca atual), *rejeitados e pausados*, e *Proteger disparados nos últimos 30 dias*.
+- **Informação para decidir** — status, data no nome (`_dia_mês_ano`), último disparo pelo DisparoMais (quantos
+  disparos e mensagens) e o texto do template. Filtros como *Nunca disparados aqui* e ordenação por idade ou uso.
+- **Confirmação** — mostra a lista final e exige digitar `APAGAR`. A remoção é feita um template por vez, com
+  progresso, botão de parar e interrupção automática após 3 falhas seguidas.
+
+Apagar é irreversível e a Meta bloqueia o mesmo nome por algumas semanas. As proteções ficam salvas no navegador
+de quem marcou.
+
 ## Velocidade de envio e limites da Meta
 
 O disparo é paralelo, com a taxa controlada em **mensagens por segundo** (campo *Velocidade* no
