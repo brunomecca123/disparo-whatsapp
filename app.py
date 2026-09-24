@@ -206,6 +206,43 @@ def criar_template(payload: TemplateDraftPayload):
     return {**criado, "name": dados["name"], "language": dados["language"]}
 
 
+def _exemplo_cabecalho(nome: str, dados: bytes, formato: str):
+    try:
+        handle = meta_api.upload_template_header_sample(nome, dados, formato)
+    except meta_api.MetaApiError as erro:
+        return _erro_meta(erro)
+    return {"handle": handle, "format": formato.upper(), "filename": nome, "size": len(dados)}
+
+
+@app.post("/api/templates/header-sample")
+async def subir_exemplo_cabecalho(file: UploadFile = File(...), format: str = Form(...)):
+    """Sobe o exemplo do cabeçalho de mídia (imagem, vídeo, PDF) de um template novo.
+
+    Devolve o handle que vai em header.handle no rascunho. Arquivos acima de 4 MB chegam
+    pela rota /from-storage, pelo mesmo motivo do upload de mídia do disparo.
+    """
+    return _exemplo_cabecalho(file.filename or "arquivo", await file.read(), format)
+
+
+class HeaderSampleFromStoragePayload(BaseModel):
+    path: str
+    filename: str = ""
+    format: str
+
+
+@app.post("/api/templates/header-sample/from-storage")
+def exemplo_cabecalho_do_storage(payload: HeaderSampleFromStoragePayload):
+    """Mesma coisa, buscando no Storage o arquivo grande que o navegador subiu."""
+    try:
+        dados = storage.baixar(payload.path)
+    except (storage.StorageError, db.DbError) as erro:
+        raise HTTPException(400, str(erro))
+    try:
+        return _exemplo_cabecalho(payload.filename or payload.path.split("/")[-1], dados, payload.format)
+    finally:
+        storage.remover(payload.path)
+
+
 # ------------------------------------------------------- remoção de templates
 
 

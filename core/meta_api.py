@@ -357,6 +357,92 @@ def _postar_media(nome: str, conteudo, mime_type: str) -> str:
     return response.json().get("id", "")
 
 
+# ------------------------------------------------ exemplo de cabeçalho (template)
+
+# O que a Meta aceita como exemplo de cabeçalho de template, por formato. É a mesma regra
+# do envio: imagem JPG/PNG até 5 MB, vídeo MP4 até 16 MB, documento PDF até 100 MB.
+MB = 1024 * 1024
+TEMPLATE_HEADER_MEDIA = {
+    "IMAGE": {"rotulo": "imagem", "tipos": {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"},
+              "limite": 5 * MB},
+    "VIDEO": {"rotulo": "vídeo", "tipos": {".mp4": "video/mp4"}, "limite": 16 * MB},
+    "DOCUMENT": {"rotulo": "documento", "tipos": {".pdf": "application/pdf"}, "limite": 100 * MB},
+}
+
+_app_id_cache: Dict[str, str] = {}
+
+
+def app_id() -> str:
+    """ID do app da Meta dono do token: é nele que a Resumable Upload API guarda o arquivo."""
+    if settings.app_id:
+        return settings.app_id
+    if settings.token in _app_id_cache:
+        return _app_id_cache[settings.token]
+    response = SESSION.get(f"{_base()}/app", headers=_headers(), params={"fields": "id"}, timeout=20)
+    try:
+        _raise_for_error(response)
+    except MetaApiError as erro:
+        erro.hint = ("Não consegui descobrir o app pelo token. Preencha META_APP_ID no .env "
+                     "(developers.facebook.com → seu app → ID do app).")
+        raise
+    identificador = str(response.json().get("id") or "")
+    if not identificador:
+        raise MetaApiError("A Meta não informou o app do token.",
+                           hint="Preencha META_APP_ID no .env (developers.facebook.com → seu app → ID do app).")
+    _app_id_cache[settings.token] = identificador
+    return identificador
+
+
+def upload_template_header_sample(nome: str, dados: bytes, formato: str) -> str:
+    """Sobe o exemplo do cabeçalho de mídia e devolve o handle que vai no template.
+
+    Criar template com cabeçalho de imagem/vídeo/documento exige um exemplo, e a Meta não
+    aceita o media id do envio: o arquivo precisa passar pela Resumable Upload API, que
+    devolve um handle ("4::aW…") para o campo example.header_handle.
+    """
+    regra = TEMPLATE_HEADER_MEDIA.get((formato or "").upper())
+    if not regra:
+        raise MetaApiError(f"Formato de cabeçalho inválido: {formato or '—'}.")
+    extensao = Path(nome or "").suffix.lower()
+    mime_type = regra["tipos"].get(extensao)
+    if not mime_type:
+        aceitos = ", ".join(sorted({e.lstrip(".").upper() for e in regra["tipos"]}))
+        raise MetaApiError(f"Arquivo {nome} não serve para cabeçalho de {regra['rotulo']}: use {aceitos}.")
+    if not dados:
+        raise MetaApiError(f"O arquivo {nome} está vazio.")
+    if len(dados) > regra["limite"]:
+        raise MetaApiError(
+            f"{nome} tem {len(dados) / MB:.1f} MB; o WhatsApp aceita no máximo "
+            f"{regra['limite'] // MB} MB para cabeçalho de {regra['rotulo']}."
+        )
+
+    # 1) abre a sessão de upload no app
+    response = SESSION.post(
+        f"{_base()}/{app_id()}/uploads",
+        headers=_headers(),
+        params={"file_name": nome, "file_length": len(dados), "file_type": mime_type},
+        timeout=30,
+    )
+    _raise_for_error(response)
+    sessao = response.json().get("id", "")
+    if not sessao:
+        raise MetaApiError("A Meta não abriu a sessão de upload do exemplo.")
+
+    # 2) manda o conteúdo inteiro de uma vez. O id da sessão já vem com "?sig=…" quando a
+    # Meta assina: vai na URL do jeito que chegou.
+    response = SESSION.post(
+        f"{_base()}/{sessao}",
+        headers={"Authorization": f"OAuth {settings.token}", "file_offset": "0"},
+        data=dados,
+        timeout=600,
+    )
+    _raise_for_error(response)
+    handle = response.json().get("h", "")
+    if not handle:
+        raise MetaApiError("A Meta recebeu o arquivo, mas não devolveu o handle do exemplo.")
+    return handle
+
+
 # ------------------------------------------------------------------- mensagem
 
 

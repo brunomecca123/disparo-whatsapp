@@ -1,8 +1,9 @@
 """Validação e montagem de templates novos para a Meta.
 
-Portado do criador_template_meta (meta_client.py). A tela já escreve as variáveis no formato
-da Meta ({{1}}, {{2}}…); a conversão continua aceitando {{nome}} e deixa tudo em sequência
-na ordem do texto, caso chegue algo fora disso.
+Portado do criador_template_meta (meta_client.py). O cabeçalho pode ser texto ou mídia
+(imagem, vídeo, documento); a mídia chega aqui já como handle do exemplo enviado à Meta.
+A tela já escreve as variáveis no formato da Meta ({{1}}, {{2}}…); a conversão continua
+aceitando {{nome}} e deixa tudo em sequência na ordem do texto, caso chegue algo fora disso.
 """
 
 import re
@@ -27,6 +28,10 @@ MAX_URL_LENGTH = 2000
 VALID_CATEGORIES = ("MARKETING", "UTILITY")
 VALID_LANGUAGES = ("pt_BR", "pt_PT", "en_US", "es_ES", "es_MX")
 BUTTON_TYPES = ("QUICK_REPLY", "URL", "PHONE_NUMBER")
+# Cabeçalho de mídia: vai com um exemplo já enviado à Meta (handle da Resumable Upload API).
+MEDIA_HEADER_FORMATS = ("IMAGE", "VIDEO", "DOCUMENT")
+HEADER_TYPES = ("NONE", "TEXT") + MEDIA_HEADER_FORMATS
+MEDIA_HEADER_LABELS = {"IMAGE": "imagem", "VIDEO": "vídeo", "DOCUMENT": "documento (PDF)"}
 
 NAME_PATTERN = re.compile(r"^[a-z0-9_]+$")
 PHONE_PATTERN = re.compile(r"^\+?\d{8,20}$")
@@ -129,8 +134,14 @@ def validate(dados: Dict) -> Tuple[List[str], List[str]]:
         erros.append(f"Idioma inválido: {idioma or '—'}.")
 
     header = dados.get("header") or {}
-    header_texto = (header.get("text") or "").strip() if header.get("type") == "TEXT" else ""
-    if header.get("type") == "TEXT":
+    header_tipo = (header.get("type") or "NONE").upper()
+    header_texto = (header.get("text") or "").strip() if header_tipo == "TEXT" else ""
+    if header_tipo not in HEADER_TYPES:
+        erros.append(f"Tipo de cabeçalho inválido: {header_tipo}.")
+    elif header_tipo in MEDIA_HEADER_FORMATS and not (header.get("handle") or "").strip():
+        erros.append(f"Cabeçalho de {MEDIA_HEADER_LABELS[header_tipo]}: escolha o arquivo de exemplo "
+                     "(a Meta só analisa o template com ele).")
+    if header_tipo == "TEXT":
         if not header_texto:
             erros.append("Cabeçalho de texto vazio — preencha ou escolha 'sem cabeçalho'.")
         elif len(header_texto) > MAX_HEADER_LENGTH:
@@ -220,7 +231,14 @@ def build_payload(dados: Dict) -> Dict:
     componentes: List[Dict] = []
 
     header = dados.get("header") or {}
-    if header.get("type") == "TEXT" and (header.get("text") or "").strip():
+    header_tipo = (header.get("type") or "").upper()
+    if header_tipo in MEDIA_HEADER_FORMATS:
+        componente = {"type": "HEADER", "format": header_tipo}
+        handle = (header.get("handle") or "").strip()
+        if handle:
+            componente["example"] = {"header_handle": [handle]}
+        componentes.append(componente)
+    elif header_tipo == "TEXT" and (header.get("text") or "").strip():
         original = header["text"].strip()
         texto, nomes = convert_named_to_indexed(original)
         componente = {"type": "HEADER", "format": "TEXT", "text": texto}
@@ -274,6 +292,8 @@ def error_hint(mensagem: str) -> Optional[str]:
         return "Um template com esse nome foi excluído há pouco; a Meta bloqueia o nome por 4 semanas."
     if "language" in texto or "idioma" in texto:
         return "Verifique o código de idioma (pt_BR para português do Brasil)."
+    if "header_handle" in texto or "handle" in texto:
+        return "O exemplo do cabeçalho não foi aceito: suba o arquivo de novo (o handle expira) e reenvie."
     if "example" in texto or "exemplo" in texto:
         return "Faltou exemplo para alguma variável, ou a quantidade não bate."
     if "rate" in texto or "limit" in texto:

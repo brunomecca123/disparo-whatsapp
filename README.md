@@ -35,8 +35,13 @@ sem passar pelo WhatsApp Manager.
   onde as variáveis aparecem como `{{1}} = nome` e a coluna da planilha com o mesmo nome já vem sugerida.
 - **Duplicar** — traz qualquer template da conta de volta para o editor, útil para corrigir um rejeitado.
 
-Por enquanto só é possível criar cabeçalho de texto; cabeçalho de imagem/vídeo/documento continua pelo
-WhatsApp Manager. Contas não verificadas têm limite de 250 templates.
+- **Cabeçalho de texto ou mídia** — acima do balão escolha *Texto*, *Imagem* (JPG/PNG até 5 MB), *Vídeo*
+  (MP4 até 16 MB) ou *Documento* (PDF). O arquivo escolhido é o exemplo que a Meta usa na análise: ele sobe na
+  hora pela Resumable Upload API e o handle devolvido vai no template. No disparo cada campanha manda a
+  própria mídia, como já acontecia. O app descobre o ID do app da Meta pelo token; se der erro, preencha
+  `META_APP_ID` no `.env`.
+
+Contas não verificadas têm limite de 250 templates.
 
 ## 🗑️ Remover templates
 

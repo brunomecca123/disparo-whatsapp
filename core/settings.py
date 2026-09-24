@@ -45,6 +45,9 @@ class Settings:
         self.token = os.getenv("WHATSAPP_TOKEN", "") or _legacy("WHATSAPP_TOKEN")
         self.phone_id = os.getenv("WHATSAPP_PHONE_ID", "") or _legacy("WHATSAPP_PHONE_ID")
         self.waba_id = os.getenv("WHATSAPP_WABA_ID", "")
+        # Só para subir o exemplo de cabeçalho com mídia na criação de template. Vazio, o
+        # app descobre sozinho pelo token (GET /app).
+        self.app_id = os.getenv("META_APP_ID", "")
         self.api_version = os.getenv("API_VERSION", "") or _legacy("API_VERSION", "v19.0")
         self.send_interval = float(os.getenv("SEND_INTERVAL", "1.0"))
         self.default_country_code = os.getenv("DEFAULT_COUNTRY_CODE", "55")

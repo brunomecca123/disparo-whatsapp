@@ -164,6 +164,20 @@
   .hl .hl-back mark{background:#e7dcf7;color:transparent;border-radius:4px;box-shadow:0 0 0 1px #d4c2f0}
   .hl .e-body{position:relative;display:block;width:100%;min-height:96px;border:0;border-radius:6px;background:transparent;
       resize:none;overflow:hidden;color:var(--ink)}
+  /* Tipo do cabeçalho: texto ou mídia (o arquivo de exemplo sobe na hora para a Meta). */
+  .hdtipos{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+  .hdtipos button{background:#eef1f3;color:var(--muted);padding:5px 11px;font-size:12px;border-radius:999px;font-weight:600}
+  .hdtipos button:hover{background:#e2e6e9;color:var(--ink)}
+  .hdtipos button.active{background:var(--brand);color:#fff}
+  .hdfile{padding:14px;margin:0;display:block}
+  .hdfile.ok{border-style:solid;border-color:var(--ok);color:var(--ink)}
+  .wa-media{margin:-3px -6px 5px;border-radius:6px;overflow:hidden;background:#dfe5e9;white-space:normal}
+  .wa-media img,.wa-media video{display:block;width:100%;max-height:260px;object-fit:cover}
+  .wa-media.vazio{height:140px;display:flex;align-items:center;justify-content:center;color:#8696a0;font-size:13px}
+  .wa-doc{display:flex;gap:10px;align-items:center;background:#f5f6f6;padding:10px}
+  .wa-doc .ico{font-size:26px}
+  .wa-doc b{display:block;font-size:13px;word-break:break-all}
+  .wa-doc span{font-size:11px;color:#8696a0}
   .ebtn{margin:6px 0 0}
   .ebtn-l{display:flex;align-items:center;gap:6px}
   .ebtn .ico{color:#027eb5;width:18px;text-align:center}
@@ -464,8 +478,18 @@
     </div>
     <div class="chatbg">
       <div class="ebubble">
-        <span class="rot">Título <i>(opcional)</i></span>
+        <span class="rot">Cabeçalho <i>(opcional)</i></span>
+        <div class="hdtipos" id="cHdTipos">
+          <button type="button" data-hd="TEXT" class="active">Aa Texto</button>
+          <button type="button" data-hd="IMAGE">🖼️ Imagem</button>
+          <button type="button" data-hd="VIDEO">🎬 Vídeo</button>
+          <button type="button" data-hd="DOCUMENT">📄 Documento</button>
+        </div>
         <input type="text" id="cHeader" class="e-hd" placeholder="Digite o título" autocomplete="off">
+        <div id="cHdMidia" class="hidden">
+          <label class="file hdfile" id="cHdBox"><input type="file" id="cHdFile"><span id="cHdFileText"></span></label>
+          <div class="hint" id="cHdStatus"></div>
+        </div>
         <span class="rot">Mensagem</span>
         <div class="hl"><div class="hl-back" id="cBodyBack"></div>
           <textarea id="cBody" class="e-body" placeholder="Digite a mensagem"></textarea></div>
@@ -554,8 +578,8 @@
     <div class="row" style="align-items:center">
       <input type="text" id="rBusca" placeholder="Buscar por nome… (ex.: ago_2026, cobranca)">
       <select id="rOrdem" style="flex:0 0 220px">
-        <option value="antigos">Mais antigos primeiro</option>
         <option value="recentes">Mais recentes primeiro</option>
+        <option value="antigos">Mais antigos primeiro</option>
         <option value="uso">Disparados há mais tempo</option>
         <option value="nome">Nome (A–Z)</option>
       </select>
@@ -1021,12 +1045,37 @@ function enviarComProgresso(url, file, contentType, aoProgredir) {
   });
 }
 
+// Sobe um arquivo pelo servidor: direto quando cabe no corpo da requisição, pelo Storage
+// quando não cabe. Usado pela mídia do disparo e pelo exemplo de cabeçalho da criação.
+async function subirArquivo(file, { direto, doStorage, campos, mediaType, status, textoDireto, textoFinal }) {
+  const spin = '<span class="spin" style="border-color:#ccc;border-top-color:#4a1f77"></span>';
+  if (file.size <= LIMITE_UPLOAD_DIRETO) {
+    status(`${textoDireto} ${spin}`);
+    const form = new FormData();
+    form.append('file', file);
+    Object.entries(campos).forEach(([k, v]) => form.append(k, v));
+    return api(direto, { method: 'POST', body: form });
+  }
+  status(`Preparando envio de ${MB(file.size)}… ${spin}`);
+  const assinatura = await api('/api/media/sign', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: file.name, media_type: mediaType, size: file.size })
+  });
+  await enviarComProgresso(assinatura.upload_url, file, assinatura.content_type, fracao => {
+    status(`Enviando ${MB(file.size)}… <b>${Math.round(fracao * 100)}%</b> ${spin}`);
+  });
+  status(`${textoFinal} ${spin}`);
+  return api(doStorage, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: assinatura.path, filename: file.name, ...campos })
+  });
+}
+
 $('mediaFile').addEventListener('change', async event => {
   const file = event.target.files[0];
   if (!file || !state.template) return;
   const type = state.template.header.format.toLowerCase();
   $('mediaFileText').innerHTML = '<b>' + esc(file.name) + '</b> — clique para trocar';
-  const spin = '<span class="spin" style="border-color:#ccc;border-top-color:#4a1f77"></span>';
 
   const teto = LIMITE_META[type];
   if (teto && file.size > teto) {
@@ -1036,28 +1085,11 @@ $('mediaFile').addEventListener('change', async event => {
   }
 
   try {
-    let data;
-    if (file.size <= LIMITE_UPLOAD_DIRETO) {
-      $('mediaStatus').innerHTML = 'Subindo arquivo para o Meta… ' + spin;
-      const form = new FormData();
-      form.append('file', file);
-      form.append('media_type', type);
-      data = await api('/api/media/upload', { method: 'POST', body: form });
-    } else {
-      $('mediaStatus').innerHTML = `Preparando envio de ${MB(file.size)}… ` + spin;
-      const assinatura = await api('/api/media/sign', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, media_type: type, size: file.size })
-      });
-      await enviarComProgresso(assinatura.upload_url, file, assinatura.content_type, fracao => {
-        $('mediaStatus').innerHTML = `Enviando ${MB(file.size)}… <b>${Math.round(fracao * 100)}%</b> ` + spin;
-      });
-      $('mediaStatus').innerHTML = 'Entregando o arquivo ao Meta… ' + spin;
-      data = await api('/api/media/from-storage', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: assinatura.path, filename: file.name, media_type: type })
-      });
-    }
+    const data = await subirArquivo(file, {
+      direto: '/api/media/upload', doStorage: '/api/media/from-storage', campos: { media_type: type },
+      mediaType: type, status: html => { $('mediaStatus').innerHTML = html; },
+      textoDireto: 'Subindo arquivo para o Meta…', textoFinal: 'Entregando o arquivo ao Meta…'
+    });
     state.headerMedia = { type, [type]: { id: data.media_id } };
     $('mediaStatus').innerHTML = `<span class="badge b-ok">ok</span> media id <span class="mono">${esc(data.media_id)}</span>`;
     renderPreview(state.samples[state.sampleIndex] || null);
@@ -1435,8 +1467,21 @@ const armazenado = {
 
 const criar = {
   view: 'disparo', buttons: [], examples: {}, descricoes: {}, nameAuto: true, foco: null,
-  lista: [], listaCarregada: false, varsChave: null, timer: null, seq: 0, validacao: null, enviando: false, proximoId: 1
+  lista: [], listaCarregada: false, varsChave: null, timer: null, seq: 0, validacao: null, enviando: false, proximoId: 1,
+  hdTipo: 'TEXT', midia: null  // midia: o arquivo de exemplo do cabeçalho e o handle devolvido pela Meta
 };
+
+// Cabeçalho de mídia: formatos e limites da Meta para o exemplo (o servidor confere de novo).
+const HD_MIDIA = {
+  IMAGE: { rotulo: 'imagem', escolher: 'a imagem', accept: '.jpg,.jpeg,.png', tipos: 'JPG ou PNG', limite: 5 * 1024 * 1024, media: 'image' },
+  VIDEO: { rotulo: 'vídeo', escolher: 'o vídeo', accept: '.mp4', tipos: 'MP4', limite: 16 * 1024 * 1024, media: 'video' },
+  DOCUMENT: { rotulo: 'documento', escolher: 'o PDF', accept: '.pdf', tipos: 'PDF', limite: 100 * 1024 * 1024, media: 'document' }
+};
+
+// Texto do título só quando o cabeçalho é de texto; com mídia, o que ficou no campo é ignorado.
+const titulo = () => criar.hdTipo === 'TEXT' ? $('cHeader').value : '';
+const midiaAtual = () => criar.midia && criar.midia.formato === criar.hdTipo ? criar.midia : null;
+const enviandoMidia = () => !!(midiaAtual() && midiaAtual().enviando);
 
 const VAR_RE = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -1509,7 +1554,7 @@ function nomeExiste(nome, idioma = $('cLang').value) {
 
 // Mesmo padrão dos nomes que já estão na conta: assunto + data (ex.: aviso_pendencia_23_set_2026).
 function gerarNome() {
-  const fonte = ($('cHeader').value.trim() + ' ' + $('cBody').value).replace(VAR_RE, ' ');
+  const fonte = (titulo().trim() + ' ' + $('cBody').value).replace(VAR_RE, ' ');
   const palavras = slug(fonte).split('_')
     .filter(p => p.length > 1 && !STOPWORDS.has(p) && !/^\d+$/.test(p)).slice(0, 4);
   if (!palavras.length) return '';
@@ -1520,7 +1565,7 @@ function gerarNome() {
   return nome;
 }
 
-const pareceMarketing = () => PROMO_RE.test(`${$('cHeader').value} ${$('cBody').value}`);
+const pareceMarketing = () => PROMO_RE.test(`${titulo()} ${$('cBody').value}`);
 const categoria = () => (document.querySelector('input[name=cCat]:checked') || {}).value || '';
 function marcarCategoria(valor) {
   document.querySelectorAll('input[name=cCat]').forEach(r => { r.checked = r.value === valor; });
@@ -1532,7 +1577,7 @@ const ordenarBotoes = bs => [...bs.filter(b => b.type === 'QUICK_REPLY'), ...bs.
 // título, mensagem e cada link de botão. Exemplo e descrição ficam em "<seção>:<n>".
 function variaveisDoRascunho() {
   const lista = [];
-  varsDe($('cHeader').value).forEach(n => lista.push({ secao: 'header', n, onde: 'no título' }));
+  varsDe(titulo()).forEach(n => lista.push({ secao: 'header', n, onde: 'no título' }));
   varsDe($('cBody').value).forEach(n => lista.push({ secao: 'body', n, onde: 'na mensagem' }));
   criar.buttons.filter(b => b.type === 'URL').forEach(b => varsDe(b.url).forEach(n =>
     lista.push({ secao: `btn:${b.id}`, n, onde: `no final do link "${b.text || 'botão'}"`, link: true })));
@@ -1582,11 +1627,14 @@ function normalizarVariaveis() {
 }
 
 function rascunho() {
-  const hd = $('cHeader').value.trim();
+  const hd = titulo().trim();
   const exemplos = (texto, secao) => Object.fromEntries(varsDe(texto).map(n => [n, criar.examples[`${secao}:${n}`] || '']));
+  const cabecalho = criar.hdTipo !== 'TEXT'
+    ? { type: criar.hdTipo, handle: (midiaAtual() || {}).handle || '' }
+    : hd ? { type: 'TEXT', text: hd, examples: exemplos(hd, 'header') } : { type: 'NONE' };
   return {
     name: nomeFinal(), category: categoria(), language: $('cLang').value,
-    header: hd ? { type: 'TEXT', text: hd, examples: exemplos(hd, 'header') } : { type: 'NONE' },
+    header: cabecalho,
     body: { text: $('cBody').value, examples: exemplos($('cBody').value, 'body') },
     footer: $('cFooter').value.trim(),
     buttons: criar.buttons.map(b => ({
@@ -1630,7 +1678,7 @@ function inserir(el, antes, depois = '') {
 
 // Campos que aceitam variável: título, mensagem e link dos botões (o rodapé não aceita).
 const aceitaVariavel = el => !!el && document.body.contains(el) &&
-  (el === $('cHeader') || el === $('cBody') || el.dataset.campo === 'url');
+  ((el === $('cHeader') && criar.hdTipo === 'TEXT') || el === $('cBody') || el.dataset.campo === 'url');
 
 function alvoDaVariavel() {
   // O botão "+ Variável" não rouba o foco (mousedown cancelado): quem está ativo é o campo
@@ -1725,7 +1773,7 @@ function renderVarsChave() {
 
 function renderContadores() {
   const conta = (rotulo, n, max) => `<span class="${n > max ? 'over' : ''}">${rotulo} ${n}/${max}</span>`;
-  const hd = $('cHeader').value.trim(), ft = $('cFooter').value.trim();
+  const hd = titulo().trim(), ft = $('cFooter').value.trim();
   $('cCounters').innerHTML = [
     hd ? conta('Título', hd.length, 60) : '',
     conta('Mensagem', $('cBody').value.trim().length, 1024),
@@ -1774,14 +1822,29 @@ function renderTexto(texto, secao) {
   });
 }
 
+// A mídia aparece como o cliente vê: a imagem/vídeo escolhido ou o cartão do PDF.
+function previewMidia() {
+  const regra = HD_MIDIA[criar.hdTipo];
+  if (!regra) return '';
+  const m = midiaAtual();
+  if (criar.hdTipo === 'DOCUMENT') {
+    return `<div class="wa-media wa-doc"><span class="ico">📄</span><div><b>${esc(m ? m.nome : 'documento.pdf')}</b>` +
+      `<span>PDF${m ? ' · ' + MB(m.tamanho) : ''}</span></div></div>`;
+  }
+  if (!m) return `<div class="wa-media vazio">${regra.rotulo} do cabeçalho</div>`;
+  return criar.hdTipo === 'IMAGE'
+    ? `<div class="wa-media"><img src="${m.url}" alt=""></div>`
+    : `<div class="wa-media"><video src="${m.url}" muted playsinline preload="metadata"></video></div>`;
+}
+
 function renderPreviewCriar() {
-  const hd = $('cHeader').value.trim(), body = $('cBody').value.trim(), ft = $('cFooter').value.trim();
+  const hd = titulo().trim(), body = $('cBody').value.trim(), ft = $('cFooter').value.trim();
   const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   let html;
-  if (!hd && !body && !ft) {
+  if (!hd && !body && !ft && criar.hdTipo === 'TEXT') {
     html = '<span class="muted">Comece a escrever e a mensagem aparece aqui.</span>';
   } else {
-    html = (hd ? `<div class="hd">${renderTexto(hd, 'header')}</div>` : '') + renderTexto(body, 'body') +
+    html = previewMidia() + (hd ? `<div class="hd">${renderTexto(hd, 'header')}</div>` : '') + renderTexto(body, 'body') +
       (ft ? `<div class="ft">${esc(ft)}</div>` : '');
   }
   html += `<span class="hora">${hora}</span>`;
@@ -1833,12 +1896,14 @@ function renderChecklist() {
   if (!r.body.text.trim()) {
     itens.push('<li class="idle">Escreva a mensagem para começar.</li>');
   } else {
-    const erros = [...data.errors];
+    // Enquanto o exemplo sobe, "falta o arquivo" não é erro: é espera.
+    const erros = data.errors.filter(e => !(enviandoMidia() && e.startsWith('Cabeçalho de ')));
+    if (enviandoMidia()) itens.push(`<li class="idle">Enviando ${esc(HD_MIDIA[criar.hdTipo].escolher)} de exemplo para a Meta…</li>`);
     const existente = r.name && nomeExiste(r.name);
     if (existente) erros.unshift(`Já existe "${r.name}" em ${r.language} na conta — a Meta recusa nomes repetidos.`);
     erros.forEach(e => itens.push(`<li class="bad">${esc(e)}</li>`));
     data.warnings.forEach(w => itens.push(`<li class="warn">${esc(w)}</li>`));
-    if (!erros.length) {
+    if (!erros.length && !enviandoMidia()) {
       const nVars = variaveisDoRascunho().length;
       itens.push(`<li class="good">Dentro das regras da Meta${nVars ? ` · ${nVars} variáve${nVars === 1 ? 'l' : 'is'} com exemplo` : ''}.</li>`);
       itens.push(`<li class="good">Vai como <b>${esc(r.name)}</b> · ${r.category === 'MARKETING' ? 'Marketing' : 'Utilidade'} · ${esc(r.language)}.</li>`);
@@ -1846,7 +1911,7 @@ function renderChecklist() {
     $('cSend').dataset.erros = erros.length;
   }
   $('cCheck').innerHTML = itens.join('');
-  $('cSend').disabled = criar.enviando || !r.body.text.trim() || Number($('cSend').dataset.erros || 0) > 0;
+  $('cSend').disabled = criar.enviando || enviandoMidia() || !r.body.text.trim() || Number($('cSend').dataset.erros || 0) > 0;
   $('cJson').textContent = JSON.stringify(data.payload, null, 2);
 }
 
@@ -1894,9 +1959,10 @@ $('cSend').addEventListener('click', async () => {
 });
 
 // ------------------------------------------------------------- cópia
-function carregarNoEditor({ header = '', body = '', footer = '', buttons = [], examples = {}, descricoes = {},
-                            category = '', language = 'pt_BR' }) {
+function carregarNoEditor({ header = '', headerType = 'TEXT', body = '', footer = '', buttons = [], examples = {},
+                            descricoes = {}, category = '', language = 'pt_BR' }) {
   $('cHeader').value = header;
+  trocarCabecalho(headerType, true);
   $('cBody').value = body;
   $('cFooter').value = footer;
   $('cLang').value = language;
@@ -1912,7 +1978,7 @@ function carregarNoEditor({ header = '', body = '', footer = '', buttons = [], e
 }
 
 function temConteudo() {
-  return $('cHeader').value.trim() || $('cBody').value.trim() || $('cFooter').value.trim() || criar.buttons.length;
+  return titulo().trim() || midiaAtual() || $('cBody').value.trim() || $('cFooter').value.trim() || criar.buttons.length;
 }
 
 // Traz um template da conta para o editor, com os exemplos que a Meta guardou e, quando ele
@@ -1939,11 +2005,17 @@ function duplicar(t) {
 
   carregarNoEditor({
     header: t.header.format === 'TEXT' ? t.header.text : '',
+    headerType: HD_MIDIA[t.header.format] ? t.header.format : 'TEXT',
     body: t.body.text, footer: t.footer || '', buttons: botoes, examples, descricoes,
     category: ['MARKETING', 'UTILITY'].includes(t.category) ? t.category : '', language: t.language
   });
-  if (!['NONE', 'TEXT'].includes(t.header.format)) {
-    toast(`O cabeçalho de ${esc(t.header.format.toLowerCase())} de <b>${esc(t.name)}</b> não foi copiado: por aqui dá para criar só cabeçalho de texto.`);
+  const regra = HD_MIDIA[t.header.format];
+  if (regra) {
+    toast(`<b>${esc(t.name)}</b> tem cabeçalho de ${regra.rotulo}: o tipo foi copiado, mas o arquivo não. ` +
+      `Escolha ${regra.escolher} de exemplo de novo.`);
+  } else if (!['NONE', 'TEXT'].includes(t.header.format)) {
+    toast(`O cabeçalho de ${esc(t.header.format.toLowerCase())} de <b>${esc(t.name)}</b> não foi copiado: por aqui dá para criar ` +
+      'cabeçalho de texto, imagem, vídeo ou documento.');
   }
   $('cBody').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -2070,6 +2142,77 @@ function trocarView(view) {
 }
 
 document.querySelectorAll('.view-btn').forEach(b => b.addEventListener('click', () => trocarView(b.dataset.view)));
+
+// ---------------------------------------------------------- cabeçalho
+function renderCabecalho() {
+  const tipo = criar.hdTipo, regra = HD_MIDIA[tipo];
+  document.querySelectorAll('#cHdTipos [data-hd]').forEach(b => b.classList.toggle('active', b.dataset.hd === tipo));
+  $('cHeader').classList.toggle('hidden', !!regra);
+  $('cHdMidia').classList.toggle('hidden', !regra);
+  if (!regra) return;
+  const m = midiaAtual();
+  $('cHdFile').accept = regra.accept;
+  $('cHdBox').classList.toggle('ok', !!(m && m.handle));
+  $('cHdFileText').innerHTML = m
+    ? `<b>${esc(m.nome)}</b> · ${MB(m.tamanho)} — clique para trocar`
+    : `Clique para escolher ${regra.escolher} de exemplo (${regra.tipos}, até ${MB(regra.limite)})`;
+  $('cHdStatus').innerHTML = m ? m.status : 'A Meta analisa o template com este arquivo. No disparo, cada campanha pode usar outro.';
+}
+
+// A mídia já escolhida fica guardada: trocar de tipo e voltar não perde o upload.
+function trocarCabecalho(tipo, limpar = false) {
+  if (limpar && criar.midia) {
+    URL.revokeObjectURL(criar.midia.url);
+    criar.midia = null;
+  }
+  criar.hdTipo = HD_MIDIA[tipo] ? tipo : 'TEXT';
+  if (criar.hdTipo !== 'TEXT' && criar.foco === $('cHeader')) criar.foco = null;
+  renderCabecalho();
+}
+
+document.querySelectorAll('#cHdTipos [data-hd]').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.hd === criar.hdTipo) return;
+  trocarCabecalho(b.dataset.hd);
+  aoMudar();
+  if (b.dataset.hd === 'TEXT') $('cHeader').focus();
+}));
+
+$('cHdFile').addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  ev.target.value = '';  // permite escolher o mesmo arquivo de novo depois de um erro
+  const formato = criar.hdTipo, regra = HD_MIDIA[formato];
+  if (!file || !regra) return;
+
+  const extensao = (file.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+  const recusa = !regra.accept.split(',').includes(extensao)
+    ? `${file.name} não serve: para ${regra.rotulo} use ${regra.tipos}.`
+    : file.size > regra.limite ? `${file.name} tem ${MB(file.size)}; o limite da Meta para ${regra.rotulo} é ${MB(regra.limite)}.` : '';
+  if (recusa) {
+    $('cHdStatus').innerHTML = `<span class="badge b-err">erro</span> ${esc(recusa)}`;
+    return;
+  }
+
+  if (criar.midia) URL.revokeObjectURL(criar.midia.url);
+  const m = { formato, nome: file.name, tamanho: file.size, url: URL.createObjectURL(file), handle: '', enviando: true, status: '' };
+  criar.midia = m;
+  const status = html => { m.status = html; if (midiaAtual() === m) $('cHdStatus').innerHTML = html; };
+  renderCabecalho();
+  aoMudar();
+  try {
+    const data = await subirArquivo(file, {
+      direto: '/api/templates/header-sample', doStorage: '/api/templates/header-sample/from-storage',
+      campos: { format: formato }, mediaType: regra.media, status,
+      textoDireto: 'Enviando o exemplo para a Meta…', textoFinal: 'Entregando o exemplo à Meta…'
+    });
+    m.handle = data.handle;
+    status('<span class="badge b-ok">ok</span> Exemplo recebido pela Meta — vai junto com o template.');
+  } catch (e) {
+    status(`<span class="badge b-err">erro</span> ${esc(e.message)}`);
+  } finally {
+    m.enviando = false;
+    if (criar.midia === m) { renderCabecalho(); aoMudar(); }
+  }
+});
 
 // ------------------------------------------------------------- eventos
 ['cHeader', 'cBody', 'cFooter'].forEach(id => $(id).addEventListener('input', aoMudar));
