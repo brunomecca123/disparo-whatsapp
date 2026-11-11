@@ -160,9 +160,18 @@ def connection():
 @app.get("/api/templates")
 def templates(ordem: str = ""):
     try:
-        return {"templates": meta_api.list_templates(aprovados_primeiro=ordem != "recentes")}
+        lista = meta_api.list_templates(aprovados_primeiro=ordem != "recentes")
     except meta_api.MetaApiError as erro:
         return _erro_meta(erro)
+    try:
+        unicos = {f"{u['name']}|{u['language']}": u for u in db.listar_disparo_unico() if not u.get("deleted_at")}
+    except db.DbError:
+        unicos = {}  # sem a tabela, a listagem segue sem a marca
+    for template in lista:
+        marca = unicos.get(f"{template['name']}|{template['language']}")
+        template["disparo_unico"] = bool(marca)
+        template["disparo_unico_erro"] = (marca or {}).get("delete_error")
+    return {"templates": lista}
 
 
 # ------------------------------------------------------- criação de templates
@@ -176,6 +185,8 @@ class TemplateDraftPayload(BaseModel):
     body: Dict = {}
     footer: str = ""
     buttons: List[Dict] = []
+    # Apagar da Meta quando o disparo real terminar (não vai no payload da Meta).
+    single_use: bool = False
 
 
 @app.post("/api/templates/validate")
@@ -203,7 +214,20 @@ def criar_template(payload: TemplateDraftPayload):
         # As dicas genéricas de meta_api falam de envio de mensagem; aqui o contexto é outro.
         erro.hint = template_builder.error_hint(erro.message) or ""
         return _erro_meta(erro)
-    return {**criado, "name": dados["name"], "language": dados["language"]}
+
+    aviso = None
+    try:
+        if payload.single_use:
+            db.marcar_disparo_unico(dados["name"], dados["language"], criado.get("id") or "")
+        else:
+            # Nome reaproveitado de um disparo único antigo não herda a marca.
+            db.desmarcar_disparo_unico(dados["name"], dados["language"])
+    except db.DbError as erro:
+        if payload.single_use:
+            aviso = ("O template foi criado, mas não consegui marcá-lo como disparo único "
+                     f"(aplique a migração supabase/migrations/2026-11-11_templates_disparo_unico.sql): {erro}")
+    return {**criado, "name": dados["name"], "language": dados["language"],
+            "single_use": payload.single_use and not aviso, "warning": aviso}
 
 
 def _exemplo_cabecalho(nome: str, dados: bytes, formato: str):
@@ -282,6 +306,11 @@ def apagar_template(payload: TemplateDeletePayload):
             if erro.code == 100 and "permission" in erro.message.lower() else ""
         )
         return _erro_meta(erro)
+    try:
+        if payload.language and campaign_service.template_unico(payload.name, payload.language):
+            db.atualizar_disparo_unico(payload.name, payload.language, {"deleted_at": "now", "delete_error": None})
+    except db.DbError:
+        pass
     return {"ok": True}
 
 
@@ -526,6 +555,14 @@ def create_campaign(payload: CampaignPayload):
     if formato in ("IMAGE", "VIDEO", "DOCUMENT") and not payload.header_media:
         raise HTTPException(400, f"Este template tem header de {formato.lower()} — envie o arquivo antes de disparar.")
 
+    # Teste e simulação não contam: o template de disparo único só sai da Meta depois
+    # do disparo de verdade.
+    unico = campaign_service.template_unico(template.get("name") or "", template.get("language") or "")
+    if unico and unico.get("deleted_at") and not payload.dry_run:
+        raise HTTPException(400, f"O template \"{template.get('name')}\" era de disparo único e já foi apagado da Meta. "
+                                 "Recarregue a lista de templates.")
+    apagar_no_fim = bool(unico and not unico.get("deleted_at") and not payload.dry_run and not payload.test_phone)
+
     campanha = campaign_service.create_campaign(
         template=template,
         recipients=destinatarios,
@@ -534,6 +571,7 @@ def create_campaign(payload: CampaignPayload):
         interval=payload.interval,
         rate=payload.rate,
         time_budget_s=payload.time_budget_s,
+        delete_template_on_finish=apagar_no_fim,
         label=(
             f"{template['name']} — teste para {destinatarios[0]['phone']}"
             if payload.test_phone
@@ -591,7 +629,10 @@ class RatePayload(BaseModel):
 def retry_failed(campaign_id: str, payload: Optional[RatePayload] = None):
     if not campaign_service.get_campaign(campaign_id):
         raise HTTPException(404, "Campanha não encontrada.")
-    nova = campaign_service.retry_failed(campaign_id, rate=payload.rate if payload else None)
+    try:
+        nova = campaign_service.retry_failed(campaign_id, rate=payload.rate if payload else None)
+    except ValueError as erro:
+        raise HTTPException(400, str(erro))
     if not nova:
         raise HTTPException(400, "Não há falhas para reenviar.")
     modo = campaign_service.start_campaign(nova["id"])
@@ -631,7 +672,10 @@ def resume_campaign(campaign_id: str, payload: Optional[RatePayload] = None):
     """Retoma uma campanha interrompida: dispara só para quem ficou pendente."""
     if not campaign_service.get_campaign(campaign_id):
         raise HTTPException(status_code=404, detail="campanha não encontrada")
-    nova = campaign_service.resume_campaign(campaign_id, rate=payload.rate if payload else None)
+    try:
+        nova = campaign_service.resume_campaign(campaign_id, rate=payload.rate if payload else None)
+    except ValueError as erro:
+        raise HTTPException(400, str(erro))
     if not nova:
         raise HTTPException(status_code=400, detail="campanha sem pendentes ou ainda em execução")
     modo = campaign_service.start_campaign(nova["id"])

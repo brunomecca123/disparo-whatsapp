@@ -32,6 +32,9 @@ create table if not exists campaigns (
   parent_id     text        references campaigns(id) on delete set null,
   resumed_by    text,
 
+  -- Campanha real de um template de disparo único: ao terminar, o template sai da Meta.
+  delete_template_on_finish boolean not null default false,
+
   -- Batimento da execução em andamento. Em serverless cada lote roda numa invocação
   -- diferente: sem isto, uma invocação cortada pela plataforma deixaria a campanha
   -- presa em 'running' e ninguém poderia retomá-la.
@@ -89,6 +92,20 @@ create table if not exists blocklist (
   created_at timestamptz not null default now()
 );
 
+-- -------------------------------------------------- templates de disparo único
+-- A Meta não guarda metadado nosso no template: a marca de "apagar depois do disparo"
+-- fica aqui, junto com o desfecho da exclusão.
+create table if not exists single_use_templates (
+  name                text        not null,
+  language            text        not null,
+  template_id         text,                     -- hsm_id: apaga só este idioma
+  created_at          timestamptz not null default now(),
+  deleted_at          timestamptz,
+  deleted_by_campaign text        references campaigns(id) on delete set null,
+  delete_error        text,
+  primary key (name, language)
+);
+
 -- ------------------------------------------------------------------- visão
 -- Pendentes contados na hora: é o número que decide se dá para retomar.
 create or replace view campaign_overview as
@@ -113,3 +130,4 @@ alter table campaigns  enable row level security;
 alter table recipients enable row level security;
 alter table uploads    enable row level security;
 alter table blocklist  enable row level security;
+alter table single_use_templates enable row level security;

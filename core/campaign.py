@@ -126,6 +126,7 @@ def create_campaign(
     parent_id: Optional[str] = None,
     rate: Optional[float] = None,
     time_budget_s: Optional[float] = None,
+    delete_template_on_finish: bool = False,
 ) -> Dict:
     campaign_id = uuid.uuid4().hex[:12]
     campanha = {
@@ -145,6 +146,10 @@ def create_campaign(
         "processed": 0,
         "parent_id": parent_id,
     }
+    if delete_template_on_finish:
+        # Só entra no INSERT quando vale: assim, sem a migração aplicada, as campanhas
+        # comuns continuam sendo criadas normalmente.
+        campanha["delete_template_on_finish"] = True
     db.inserir_campanha(campanha)
     db.inserir_destinatarios(campaign_id, recipients)
     return campanha
@@ -337,9 +342,72 @@ def executar(campaign_id: str, time_budget_s: Optional[float] = None) -> Optiona
 
     # Estado final gravado antes de chamar a próxima invocação: assim as duas nunca se
     # sobrepõem — quem entra encontra a campanha liberada e o progresso já salvo.
+    if status == "finished" and campanha.get("delete_template_on_finish"):
+        apagar_template_unico(campanha)
+
     if status == "paused" and SERVERLESS:
         _agendar_execucao(campaign_id, time_budget_s)
     return db.buscar_campanha(campaign_id)
+
+
+# ------------------------------------------------ templates de disparo único
+
+
+def template_unico(nome: str, idioma: str) -> Optional[Dict]:
+    """A marca de disparo único do template, ou None (inclusive sem a tabela criada)."""
+    try:
+        return db.buscar_disparo_unico(nome, idioma)
+    except db.DbError:
+        return None
+
+
+def apagar_template_unico(campanha: Dict) -> Optional[str]:
+    """Apaga da Meta o template de disparo único quando ninguém mais vai usá-lo.
+
+    Roda depois de a campanha estar gravada como concluída. Mensagens já aceitas pela Meta
+    continuam sendo entregues mesmo com o template apagado (ele fica em PENDING_DELETION).
+    Devolve o erro, se houve; o desfecho fica gravado em single_use_templates.
+    """
+    nome = (campanha.get("template") or {}).get("name")
+    idioma = (campanha.get("template") or {}).get("language")
+    if not nome or not idioma:
+        return None
+    try:
+        registro = db.buscar_disparo_unico(nome, idioma)
+        if not registro or registro.get("deleted_at"):
+            return None
+        # Outra campanha real ainda com fila: quem apaga é a última a terminar.
+        if db.campanhas_que_ainda_usam(nome, idioma, campanha["id"]):
+            return None
+    except db.DbError as erro:
+        return str(erro)
+
+    template_id = registro.get("template_id") or (campanha.get("template_full") or {}).get("id") or ""
+    if not template_id:
+        # Só com o nome a Meta apagaria o template em todos os idiomas: melhor não arriscar.
+        erro = "sem o id do template na Meta — apague manualmente na aba Remover templates"
+        _gravar_desfecho(nome, idioma, {"delete_error": erro})
+        return erro
+    try:
+        meta_api.delete_template(nome, template_id)
+    except meta_api.MetaApiError as erro:
+        mensagem = f"[{erro.code}] {erro.message}" if erro.code else erro.message
+        _gravar_desfecho(nome, idioma, {"delete_error": mensagem[:500]})
+        return mensagem
+    except Exception as erro:  # rede, timeout
+        _gravar_desfecho(nome, idioma, {"delete_error": str(erro)[:500]})
+        return str(erro)
+    _gravar_desfecho(nome, idioma, {
+        "deleted_at": "now", "deleted_by_campaign": campanha["id"], "delete_error": None,
+    })
+    return None
+
+
+def _gravar_desfecho(nome: str, idioma: str, campos: Dict) -> None:
+    try:
+        db.atualizar_disparo_unico(nome, idioma, campos)
+    except db.DbError:
+        pass  # o template já foi (ou não) apagado; perder só o registro não muda o envio
 
 
 # ------------------------------------------------- execução em outra invocação
@@ -536,6 +604,20 @@ def get_status(campaign_id: str) -> Optional[Dict]:
                        and not _execucao_viva(campanha)),
         "errors": [{"phone": f["phone"], "error": f["error"]} for f in falhas],
         "error_count": len(falhas),
+        "template_unico": _situacao_template_unico(campanha),
+    }
+
+
+def _situacao_template_unico(campanha: Dict) -> Optional[Dict]:
+    """Para a tela: este disparo apaga o template ao terminar? Já apagou? Deu erro?"""
+    if not campanha.get("delete_template_on_finish"):
+        return None
+    template = campanha.get("template") or {}
+    registro = template_unico(template.get("name") or "", template.get("language") or "") or {}
+    return {
+        "deleted_at": registro.get("deleted_at"),
+        "deleted_by_campaign": registro.get("deleted_by_campaign"),
+        "error": registro.get("delete_error"),
     }
 
 
@@ -589,6 +671,13 @@ def _recriar(original: Dict, destinatarios: List[Dict], sufixo: str,
              rate: Optional[float] = None) -> Optional[Dict]:
     if not destinatarios:
         return None
+    template = original.get("template") or {}
+    registro = template_unico(template.get("name") or "", template.get("language") or "")
+    if registro and registro.get("deleted_at") and not original["dry_run"]:
+        raise ValueError(
+            f"O template \"{template.get('name')}\" era de disparo único e já foi apagado da Meta "
+            "quando o disparo terminou — os envios falhariam. Crie o template de novo para reenviar."
+        )
     base = original["label"].split(" · retomada")[0].split(" — reenvio")[0]
     return create_campaign(
         template=original["template_full"],
@@ -599,6 +688,7 @@ def _recriar(original: Dict, destinatarios: List[Dict], sufixo: str,
         time_budget_s=original.get("time_budget_s"),
         label=f"{base} {sufixo}",
         parent_id=original["id"],
+        delete_template_on_finish=bool(original.get("delete_template_on_finish")),
     )
 
 

@@ -529,6 +529,10 @@
 
   <section class="card">
     <h2><span class="step" id="stepEnviar">5</span>Enviar para aprovação</h2>
+    <label class="switch"><input type="checkbox" id="cSingleUse"> <b>Disparo único</b> — apagar este template da Meta quando o disparo terminar</label>
+    <div class="hint" style="margin:-4px 0 12px">Para campanhas pontuais: assim que o disparo real é concluído, o template sai da conta
+      e libera a vaga. Envio de teste e simulação não contam. Quem já recebeu continua recebendo normalmente.
+      Depois de apagado, não dá para reenviar as falhas nem usar de novo — e a Meta bloqueia o mesmo nome por algumas semanas.</div>
     <ul class="checklist" id="cCheck"><li class="idle">Escreva a mensagem para começar.</li></ul>
     <button class="btn-big" id="cSend" disabled>Enviar para a Meta aprovar</button>
     <div id="cResult"></div>
@@ -807,6 +811,9 @@ function selectTemplate() {
     `<span class="badge b-mute">header: ${esc(tpl.header.format.toLowerCase())}</span> ` +
     `<span class="badge ${nVars ? 'b-warn' : 'b-mute'}">${nVars} variáve${nVars === 1 ? 'l' : 'is'}</span>` +
     (tpl.named_params ? ' <span class="badge b-mute">variáveis nomeadas</span>' : '') +
+    (tpl.disparo_unico ? ' <span class="badge b-warn">🗑 disparo único</span>' : '') +
+    (tpl.disparo_unico ? '<div class="hint">Template de <b>disparo único</b>: quando este disparo terminar, ele é apagado da Meta. ' +
+      'Envio de teste e simulação não apagam.' + (tpl.disparo_unico_erro ? ` <span class="bad-text">Última tentativa de apagar falhou: ${esc(tpl.disparo_unico_erro)}</span>` : '') + '</div>' : '') +
     (emAnalise ? '<div class="hint">Este template ainda está em análise pela Meta. Você pode montar e revisar a campanha, mas o envio só funciona depois da aprovação.</div>' : '');
 
   const needsMedia = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(tpl.header.format);
@@ -1208,7 +1215,10 @@ $('sendBtn').addEventListener('click', () => {
   const aviso = state.template.status !== 'APPROVED' && !$('dryRun').checked
     ? `\n\nATENÇÃO: o template está com status ${state.template.status} — a Meta deve recusar os envios.`
     : '';
-  startCampaign(campaignPayload(), `Disparar ${total} mensagens com o template "${state.template.name}"?${modo}${tempo}${aviso}`);
+  const unico = state.template.disparo_unico && !$('dryRun').checked
+    ? '\n\nDISPARO ÚNICO: ao terminar, o template será apagado da Meta e não poderá ser usado de novo (nem para reenviar falhas).'
+    : '';
+  startCampaign(campaignPayload(), `Disparar ${total} mensagens com o template "${state.template.name}"?${modo}${tempo}${aviso}${unico}`);
 });
 
 $('testBtn').addEventListener('click', () => {
@@ -1251,7 +1261,7 @@ async function pollCampaign() {
       <div class="stat"><b>${data.pending}</b><span>pendentes</span></div>
       <div class="stat"><b>${pct}%</b><span>progresso</span></div>`;
 
-    $('progAlert').innerHTML = alertaDaCampanha(data);
+    $('progAlert').innerHTML = alertaDaCampanha(data) + alertaTemplateUnico(data);
     $('cancelBtn').disabled = data.status !== 'running';
     $('retryBtn').disabled = data.failed === 0 || data.status === 'running';
     const rodando = data.status === 'running';
@@ -1299,6 +1309,25 @@ function ritmoTexto(data) {
       : `há ${duracaoLonga(data.duracao_s)}`);
   }
   return partes.join(' · ');
+}
+
+// Template de disparo único: avisa antes e conta o que aconteceu com ele no fim.
+function alertaTemplateUnico(data) {
+  const u = data.template_unico;
+  if (!u) return '';
+  if (u.deleted_at) {
+    const aqui = !u.deleted_by_campaign || u.deleted_by_campaign === data.id;
+    return `<div class="alert a-ok" style="margin-top:8px">🗑 Template de disparo único <b>apagado da Meta</b>${aqui ? ' ao fim deste disparo' : ''}.
+      Quem já recebeu continua recebendo normalmente.</div>`;
+  }
+  if (data.status === 'finished') {
+    return u.error
+      ? `<div class="alert a-err" style="margin-top:8px">Não consegui apagar o template de disparo único: ${esc(u.error)}.
+          Apague pela aba <b>Remover templates</b>.</div>`
+      : `<div class="alert a-info" style="margin-top:8px">🗑 Template de disparo único mantido: outra campanha ainda tem envios pendentes com ele.
+          Ele sai da Meta quando a última terminar.</div>`;
+  }
+  return `<div class="hint" style="margin-top:8px">🗑 Disparo único: o template será apagado da Meta quando este disparo terminar.</div>`;
 }
 
 // Explica o que aconteceu quando a campanha não terminou sozinha.
@@ -1640,7 +1669,8 @@ function rascunho() {
     buttons: criar.buttons.map(b => ({
       type: b.type, text: b.text || '', url: b.url || '', phone: b.phone || '',
       example: criar.examples[`btn:${b.id}:1`] || ''
-    }))
+    })),
+    single_use: $('cSingleUse').checked
   };
 }
 
@@ -1907,6 +1937,7 @@ function renderChecklist() {
       const nVars = variaveisDoRascunho().length;
       itens.push(`<li class="good">Dentro das regras da Meta${nVars ? ` · ${nVars} variáve${nVars === 1 ? 'l' : 'is'} com exemplo` : ''}.</li>`);
       itens.push(`<li class="good">Vai como <b>${esc(r.name)}</b> · ${r.category === 'MARKETING' ? 'Marketing' : 'Utilidade'} · ${esc(r.language)}.</li>`);
+      if (r.single_use) itens.push('<li class="warn">Disparo único: o template será apagado da Meta quando o disparo real terminar.</li>');
     }
     $('cSend').dataset.erros = erros.length;
   }
@@ -1920,6 +1951,7 @@ $('cSend').addEventListener('click', async () => {
   const r = rascunho();
   if (!confirm(`Enviar "${r.name}" para análise da Meta?\n\n` +
     `Categoria: ${r.category === 'MARKETING' ? 'Marketing' : 'Utilidade'} · idioma ${r.language}\n\n` +
+    (r.single_use ? 'DISPARO ÚNICO: será apagado da Meta assim que o disparo real terminar.\n\n' : '') +
     'Depois de enviado, o texto não pode mais ser alterado — para mudar, é preciso criar outro com outro nome.')) return;
 
   const botao = $('cSend');
@@ -1945,7 +1977,9 @@ $('cSend').addEventListener('click', async () => {
       <b>${aprovado ? '✅ Aprovado na hora!' : '⏳ Enviado — em análise pela Meta.'}</b>
       <span class="mono">${esc(data.name)}</span> ${aprovado ? 'já pode ser usado.' :
         'A resposta costuma sair em minutos. Esta tela confere sozinha e avisa quando sair o resultado — pode continuar usando o sistema.'}
-      ${aprovado ? `<div style="margin-top:6px"><a href="#" id="cUsarAgora">Usar no disparo →</a></div>` : ''}</div>`;
+      ${data.single_use ? '<div style="margin-top:6px">🗑 Marcado como <b>disparo único</b>: sai da Meta quando o disparo terminar.</div>' : ''}
+      ${aprovado ? `<div style="margin-top:6px"><a href="#" id="cUsarAgora">Usar no disparo →</a></div>` : ''}</div>` +
+      (data.warning ? `<div class="alert a-warn" style="margin-top:8px">${esc(data.warning)}</div>` : '');
     const usar = $('cUsarAgora');
     if (usar) usar.addEventListener('click', ev => { ev.preventDefault(); usarNoDisparo(data.name, data.language); });
   } catch (e) {
@@ -1966,6 +2000,7 @@ function carregarNoEditor({ header = '', headerType = 'TEXT', body = '', footer 
   $('cBody').value = body;
   $('cFooter').value = footer;
   $('cLang').value = language;
+  $('cSingleUse').checked = false;
   criar.examples = { ...examples };
   criar.descricoes = { ...descricoes };
   criar.buttons = [];
@@ -2054,7 +2089,7 @@ function renderLista() {
     const indice = criar.lista.indexOf(t);
     return `<div class="tplrow">
       <div><div class="nome mono">${criados[`${t.name}|${t.language}`] ? '<span title="criado por aqui" style="color:var(--marca-rosa)">★</span> ' : ''}${esc(t.name)}</div>
-        <div class="muted" style="font-size:12px">${esc(t.language)} · ${esc((t.category || '—').toLowerCase())}</div>${motivo}</div>
+        <div class="muted" style="font-size:12px">${esc(t.language)} · ${esc((t.category || '—').toLowerCase())}${t.disparo_unico ? ' · <span title="Apagado da Meta quando o disparo terminar">🗑 disparo único</span>' : ''}</div>${motivo}</div>
       <div style="text-align:right;white-space:nowrap"><span class="badge ${classe}">${esc(rotulo)}</span>
         <div class="acoes">${t.status === 'APPROVED' ? `<a href="#" data-usar="${indice}">usar</a>` : ''}<a href="#" data-dup="${indice}">duplicar</a></div></div>
     </div>`;
@@ -2443,6 +2478,7 @@ function linhaRemocao(t) {
     <div><div class="nome mono">${esc(t.name)}</div>
       <div class="rmeta"><span class="badge ${classe}">${esc(rotulo)}</span>
         <span class="badge b-mute">${esc((t.category || '—').toLowerCase())}</span><span class="badge b-mute">${esc(t.language)}</span>
+        ${t.disparo_unico ? '<span class="badge b-warn" title="Sai da Meta sozinho quando o disparo terminar">🗑 disparo único</span>' : ''}
         ${t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE' ? `<span class="badge b-err">${esc(MOTIVO_REJEICAO[t.rejected_reason] || t.rejected_reason)}</span>` : ''}</div></div>
     <div class="rdata">${t.data ? dataCurta(t.data) : '<span class="muted">—</span>'}</div>
     <div class="ruso">${u && u.ultimo

@@ -252,6 +252,58 @@ def buscar_upload(upload_id: str) -> Optional[Dict]:
     return linhas[0] if linhas else None
 
 
+# ------------------------------------------------ templates de disparo único
+
+
+def _chave_template(nome: str, idioma: str) -> str:
+    return f"name=eq.{quote(nome, safe='')}&language=eq.{quote(idioma, safe='')}"
+
+
+def marcar_disparo_unico(nome: str, idioma: str, template_id: str = "") -> None:
+    """Grava (ou reativa) a marca. Um nome recriado depois de apagado começa do zero."""
+    _pedir("POST", "/single_use_templates?on_conflict=name,language", json={
+        "name": nome, "language": idioma, "template_id": template_id or None,
+        "deleted_at": None, "deleted_by_campaign": None, "delete_error": None,
+    }, extra_headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+
+
+def desmarcar_disparo_unico(nome: str, idioma: str) -> None:
+    _pedir("DELETE", f"/single_use_templates?{_chave_template(nome, idioma)}",
+           extra_headers={"Prefer": "return=minimal"})
+
+
+def buscar_disparo_unico(nome: str, idioma: str) -> Optional[Dict]:
+    resposta = _pedir("GET", f"/single_use_templates?{_chave_template(nome, idioma)}&limit=1")
+    linhas = _linhas(resposta)
+    return linhas[0] if linhas else None
+
+
+def listar_disparo_unico() -> List[Dict]:
+    resposta = _pedir("GET", "/single_use_templates?select=name,language,deleted_at,delete_error&limit=10000")
+    return _linhas(resposta)
+
+
+def atualizar_disparo_unico(nome: str, idioma: str, campos: Dict) -> None:
+    _pedir("PATCH", f"/single_use_templates?{_chave_template(nome, idioma)}", json=campos,
+           extra_headers={"Prefer": "return=minimal"})
+
+
+def campanhas_que_ainda_usam(nome: str, idioma: str, exceto_id: str) -> List[Dict]:
+    """Outras campanhas com contatos por enviar neste template — enquanto houver, ele fica.
+
+    Simulação não conta (não chama a Meta). Campanha já retomada também não: quem ficou
+    com os pendentes dela é a retomada, que entra nesta mesma consulta.
+    """
+    resposta = _pedir(
+        "GET",
+        f"/campaign_overview?template->>name=eq.{quote(nome, safe='')}"
+        f"&template->>language=eq.{quote(idioma, safe='')}"
+        f"&id=neq.{exceto_id}&dry_run=is.false&resumed_by=is.null&pending=gt.0"
+        f"&status=in.(pending,running,paused,interrupted)&select=id",
+    )
+    return _linhas(resposta)
+
+
 # ---------------------------------------------------------------- blocklist
 
 
