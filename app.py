@@ -602,8 +602,22 @@ def executar_lote(payload: InternalRunPayload, x_internal_token: str = Header(de
 
 
 @app.get("/api/campaigns")
-def list_campaigns():
-    return {"campaigns": campaign_service.list_campaigns()}
+def list_campaigns(limite: int = 30):
+    """Campanhas mais recentes. `limite` existe para a importação de histórico do sistema
+    principal (medição de efetividade); a tela continua pedindo as 30 últimas."""
+    return {"campaigns": campaign_service.list_campaigns(max(1, min(limite, 1000)))}
+
+
+@app.get("/api/campaigns/{campaign_id}/recipients")
+def campaign_recipients(campaign_id: str):
+    """Destinatários de uma campanha com o id da mensagem na Meta e o horário do envio.
+
+    Somente leitura. É o que o sistema principal importa para medir custo e retorno dos
+    disparos em lote; a categoria vem junto porque define o preço da mensagem."""
+    dados = campaign_service.recipients_export(campaign_id)
+    if not dados:
+        raise HTTPException(404, "Campanha não encontrada.")
+    return dados
 
 
 @app.get("/api/campaigns/{campaign_id}")

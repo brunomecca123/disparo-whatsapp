@@ -236,6 +236,24 @@ def todos_destinatarios(campaign_id: str) -> List[Dict]:
         pagina += 1
 
 
+def destinatarios_para_exportar(campaign_id: str) -> List[Dict]:
+    """Destinatários com o id da mensagem e o horário do envio, para a medição de efetividade."""
+    saida, pagina, tamanho = [], 0, 1000
+    while True:
+        resposta = _pedir(
+            "GET",
+            f"/recipients?campaign_id=eq.{campaign_id}"
+            f"&select=idx,phone,status,message_id,sent_at&order=idx.asc"
+            f"&limit={tamanho}&offset={pagina * tamanho}",
+            timeout=60,
+        )
+        linhas = _linhas(resposta)
+        saida.extend(linhas)
+        if len(linhas) < tamanho:
+            return saida
+        pagina += 1
+
+
 # ------------------------------------------------------------------ uploads
 
 

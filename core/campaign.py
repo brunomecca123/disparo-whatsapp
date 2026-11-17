@@ -636,6 +636,31 @@ def list_campaigns(limite: int = 30) -> List[Dict]:
     ]
 
 
+def recipients_export(campaign_id: str) -> Optional[Dict]:
+    """Campanha + destinatários no formato lido pelo sistema principal."""
+    campanha = db.buscar_campanha(campaign_id)
+    if not campanha:
+        return None
+    template_full = campanha.get("template_full") or {}
+    return {
+        "campaign": {
+            "id": campanha["id"], "label": campanha["label"], "template": campanha["template"],
+            "category": template_full.get("category"),
+            "status": campanha["status"], "dry_run": campanha["dry_run"],
+            "total": campanha["total"], "sent": campanha["sent"], "failed": campanha["failed"],
+            "created_at": campanha.get("created_at"), "started_at": campanha.get("started_at"),
+            "finished_at": campanha.get("finished_at"), "parent_id": campanha.get("parent_id"),
+        },
+        "recipients": [
+            {
+                "idx": d["idx"], "phone": d["phone"], "status": d["status"],
+                "message_id": d.get("message_id"), "sent_at": d.get("sent_at"),
+            }
+            for d in db.destinatarios_para_exportar(campaign_id)
+        ],
+    }
+
+
 def uso_templates() -> Dict[str, Dict]:
     """Resumo de uso por template ("nome|idioma"): último disparo real, quantos e se há um ativo.
 
