@@ -7,6 +7,7 @@ Uso:
 """
 
 import hmac
+import os
 import re
 import uuid
 import webbrowser
@@ -608,12 +609,27 @@ def list_campaigns(limite: int = 30):
     return {"campaigns": campaign_service.list_campaigns(max(1, min(limite, 1000)))}
 
 
+def _exigir_token_sistema(authorization: str) -> None:
+    """Com SISTEMA_API_TOKEN definido, a rota só responde a quem manda o mesmo token.
+
+    Sem a variável, segue aberta como as demais, para não quebrar a importação enquanto
+    o token não estiver configurado dos dois lados."""
+    esperado = os.getenv("SISTEMA_API_TOKEN", "")
+    if not esperado:
+        return
+    recebido = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+    if not hmac.compare_digest(recebido, esperado):
+        raise HTTPException(401, "token do sistema inválido")
+
+
 @app.get("/api/campaigns/{campaign_id}/recipients")
-def campaign_recipients(campaign_id: str):
+def campaign_recipients(campaign_id: str, authorization: str = Header(default="")):
     """Destinatários de uma campanha com o id da mensagem na Meta e o horário do envio.
 
     Somente leitura. É o que o sistema principal importa para medir custo e retorno dos
-    disparos em lote; a categoria vem junto porque define o preço da mensagem."""
+    disparos em lote; a categoria vem junto porque define o preço da mensagem. Traz os
+    telefones, por isso aceita o token compartilhado com o sistema."""
+    _exigir_token_sistema(authorization)
     dados = campaign_service.recipients_export(campaign_id)
     if not dados:
         raise HTTPException(404, "Campanha não encontrada.")
